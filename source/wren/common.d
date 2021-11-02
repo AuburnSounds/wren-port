@@ -39,6 +39,10 @@ else
     enum WREN_NAN_TAGGING = 1;
 }
 
+// Wren's "computed goto" functionality depends on a non-standard GCC extension,
+// which allows you to take the pointer of labels defined within a loop. D, from what I know,
+// does not support this, so we disable this functionality.
+/*
 // If true, the VM's interpreter loop uses computed gotos. See this for more:
 // http://gcc.gnu.org/onlinedocs/gcc-3.1.1/gcc/Labels-as-Values.html
 // Enabling this speeds up the main dispatch loop a bit, but requires compiler
@@ -53,6 +57,7 @@ else
 {
     enum WREN_COMPUTED_GOTO = 1;
 }
+*/
 
 // The VM includes a number of optional modules. You can choose to include
 // these or not. By default, they are all available. To disable one, set the
@@ -168,6 +173,7 @@ enum MAX_VARIABLE_NAME = 64;
 // field index*.
 enum MAX_FIELDS = 255;
 
+// XXX: move this to `wren.vm`?
 // Use the VM's allocator to allocate an object of [type].
 T* ALLOCATE(VM, T)(VM* vm) @nogc
 {
@@ -179,9 +185,25 @@ T* ALLOCATE(VM, T)(VM* vm) @nogc
 // flexible array of [count] objects of [arrayType].
 T* ALLOCATE_FLEX(VM, T, ArrayType)(VM* vm, size_t count) @nogc
 {
+    import std.traits : isArray;
     import wren.vm : wrenReallocate;
-    return cast(typeof(return))wrenReallocate(vm, null, 0,
-        T.sizeof + ArrayType.sizeof * count);
+    T* obj = cast(T*)wrenReallocate(vm, null, 0, T.sizeof);
+    ArrayType* arr = cast(ArrayType*)wrenReallocate(vm, null, 0, ArrayType.sizeof * count);
+
+    // EEEEK. Since arrays differ in implementation,
+    // we can't just malloc the size of an object + the size of the array we want to
+    // allocate for. This is a little tricky way of getting around that --
+    // but this WILL break if T has more then one array.
+    static foreach(_mem; __traits(allMembers, T)) {{
+        alias member = __traits(getMember, T, _mem);
+        static if (isArray!(typeof(member))) {
+            alias ArrayElementType = typeof(member[0]);
+            static if (is(ArrayElementType == ArrayType)) {
+                __traits(child, obj, member) = arr[0 .. count];
+            }  
+        }
+    }}
+    return obj;
 }
 
 T* ALLOCATE_ARRAY(VM, T)(VM* vm, size_t count) @nogc

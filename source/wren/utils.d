@@ -1,9 +1,15 @@
 module wren.utils;
 
 // We need buffers of a few different types.
-// No pre-processor here :)
-string DECLARE_BUFFER(string name, string type) {
-    import std.format;
+// No pre-processor here -- realistically, this should be a mixin template,
+// but a mixin template... still requires mixins to declare our functions like this.
+// We also can't technically mark this @nogc, since std.format *does* use the GC
+// but this should *only* ever be run at compile-time.
+package string DECLARE_BUFFER(string name, string type) {
+    if (!__ctfe) assert(0, "This function should never be run outside of CTFE.");
+
+    import std.format : format;
+
     return format!q"{
     struct %1$sBuffer {
         %2$s* data;
@@ -18,11 +24,13 @@ string DECLARE_BUFFER(string name, string type) {
     }
 
     void wren%1$sBufferClear(VM)(VM* vm, %1$sBuffer* buffer) @nogc {
+        import wren.vm : wrenReallocate;
         wrenReallocate(vm, buffer.data, 0, 0);
         wren%1$sBufferInit(buffer);
     }
 
     void wren%1$sBufferFill(VM)(VM* vm, %1$sBuffer* buffer, %2$s data, int count) @nogc {
+        import wren.vm : wrenReallocate;
         if (buffer.capacity < buffer.count + count) {
             int capacity = wrenPowerOf2Ceil(buffer.count + count);
             buffer.data = cast(%2$s*)wrenReallocate(vm, buffer.data, 
@@ -43,58 +51,6 @@ string DECLARE_BUFFER(string name, string type) {
 
 mixin(DECLARE_BUFFER("Byte", "ubyte"));
 mixin(DECLARE_BUFFER("Int", "int"));
-
-import wren.value : StringBuffer, wrenStringBufferInit, wrenStringBufferClear;
-alias SymbolTable = StringBuffer;
-
-// Initializes the symbol table.
-void wrenSymbolTableInit(SymbolTable* symbols) @nogc
-{
-    wrenStringBufferInit(symbols);
-}
-
-// Frees all dynamically allocated memory used by the symbol table, but not the
-// SymbolTable itself.
-void wrenSymbolTableClear(VM)(VM* vm, SymbolTable* symbols) @nogc
-{
-    wrenStringBufferClear(vm, symbols);
-}
-
-// Adds name to the symbol table. Returns the index of it in the table.
-int wrenSymbolTableAdd(VM)(VM* vm, SymbolTable* symbols,
-                       const(char)* name, size_t length) @nogc
-{
-    assert(0, "Stub");
-/*
-  ObjString* symbol = AS_STRING(wrenNewStringLength(vm, name, length));
-  
-  wrenPushRoot(vm, &symbol->obj);
-  wrenStringBufferWrite(vm, symbols, symbol);
-  wrenPopRoot(vm);
-  
-  return symbols->count - 1;
-  */
-}
-
-// Adds name to the symbol table. Returns the index of it in the table. Will
-// use an existing symbol if already present.
-int wrenSymbolTableEnsure(VM)(VM* vm, SymbolTable* symbols,
-                          const(char)* name, size_t length) @nogc
-{
-    assert(0, "stub");
-}
-
-// Looks up name in the symbol table. Returns its index if found or -1 if not.
-int wrenSymbolTableFind(const SymbolTable* symbols,
-                        const(char)* name, size_t length) @nogc
-{
-    assert(0, "Stub");
-}
-
-void wrenBlackenSymbolTable(VM)(VM* vm, SymbolTable* symbolTable) @nogc
-{
-    assert(0, "Stub");
-}
 
 // Returns the number of bytes needed to encode [value] in UTF-8.
 //

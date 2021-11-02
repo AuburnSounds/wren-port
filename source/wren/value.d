@@ -39,9 +39,6 @@ import wren.utils;
 // The representation is controlled by the `WREN_NAN_TAGGING` define. If that's
 // defined, Nan tagging is used.
 
-
-
-
 // Identifies which specific type a heap-allocated object is.
 enum ObjType {
   OBJ_CLASS,
@@ -230,8 +227,6 @@ bool IS_STRING(Value value) {
     return wrenIsObjType(value, ObjType.OBJ_STRING);
 }
 
-
-
 // A heap-allocated string object.
 struct ObjString
 {
@@ -248,6 +243,69 @@ struct ObjString
 }
 
 mixin(DECLARE_BUFFER("String", "ObjString*"));
+
+alias SymbolTable = StringBuffer;
+
+// This import has to be here. Otherwise, we run into weird undefined identifier problems.
+import wren.vm;
+
+// Initializes the symbol table.
+void wrenSymbolTableInit(SymbolTable* symbols) @nogc
+{
+    wrenStringBufferInit(symbols);
+}
+
+// Frees all dynamically allocated memory used by the symbol table, but not the
+// SymbolTable itself.
+void wrenSymbolTableClear(WrenVM* vm, SymbolTable* symbols) @nogc
+{
+    wrenStringBufferClear(vm, symbols);
+}
+
+// Adds name to the symbol table. Returns the index of it in the table.
+int wrenSymbolTableAdd(WrenVM* vm, SymbolTable* symbols,
+                       const(char)* name, size_t length) @nogc
+{
+    ObjString* symbol = AS_STRING(wrenNewStringLength(vm, name, length));
+  
+    wrenPushRoot(vm, &symbol.obj);
+    wrenStringBufferWrite(vm, symbols, symbol);
+    wrenPopRoot(vm);
+  
+    return symbols.count - 1;
+}
+
+// Adds name to the symbol table. Returns the index of it in the table. Will
+// use an existing symbol if already present.
+int wrenSymbolTableEnsure(WrenVM* vm, SymbolTable* symbols,
+                          const(char)* name, size_t length) @nogc
+{
+    // See if the symbol is already defined.
+    int existing = wrenSymbolTableFind(symbols, name, length);
+    if (existing != -1) return existing;
+
+    // New symbol, so add it.
+    return wrenSymbolTableAdd(vm, symbols, name, length);
+}
+
+// Looks up name in the symbol table. Returns its index if found or -1 if not.
+int wrenSymbolTableFind(const SymbolTable* symbols,
+                        const(char)* name, size_t length) @nogc
+{
+    // See if the symbol is already defined.
+    // TODO: O(n). Do something better.
+    for (int i = 0; i < symbols.count; i++)
+    {
+        if (wrenStringEqualsCString(cast(ObjString*)symbols.data[i], name, length)) return i;
+    }
+
+    return -1;
+}
+
+void wrenBlackenSymbolTable(WrenVM* vm, SymbolTable* symbolTable) @nogc
+{
+    assert(0, "Stub");
+}
 
 // The dynamically allocated data structure for a variable that has been used
 // by a closure. Whenever a function accesses a variable declared in an
@@ -280,14 +338,7 @@ struct ObjUpvalue
     ObjUpvalue* next;
 }
 
-import wren.vm : WrenVM, WrenForeignMethodFn, wrenPushRoot, wrenPopRoot, wrenReallocate;
-// The type of a primitive function.
-//
-// Primitives are similar to foreign functions, but have more direct access to
-// VM internals. It is passed the arguments in [args]. If it returns a value,
-// it places it in `args[0]` and returns `true`. If it causes a runtime error
-// or modifies the running fiber, it returns `false`.
-alias Primitive = bool function(WrenVM* vm, Value* args);
+
 
 // TODO: See if it's actually a perf improvement to have this in a separate
 // struct instead of in ObjFn.
@@ -579,6 +630,14 @@ struct ObjRange
     // True if [to] is included in the range.
     bool isInclusive;
 }
+
+struct WrenHandle
+{
+  Value value;
+
+  WrenHandle* prev;
+  WrenHandle* next;
+};
 
 // An IEEE 754 double-precision float is a 64-bit value with bits laid out like:
 //
@@ -947,6 +1006,7 @@ void wrenBindMethod(WrenVM* vm, ObjClass* classObj, int symbol, Method method)
 ObjClosure* wrenNewClosure(WrenVM* vm, ObjFn* fn)
 {
     ObjClosure* closure = ALLOCATE_FLEX!(WrenVM, ObjClosure, ObjUpvalue*)(vm, fn.numUpvalues);
+
     initObj(vm, &closure.obj, ObjType.OBJ_CLOSURE, vm.fnClass);
 
     closure.fn = fn;
@@ -1734,6 +1794,66 @@ static bool wrenStringEqualsCString(ObjString* a, const(char)* b, size_t length)
     return a.length == length && memcmp(a.value.ptr, b, length) == 0;
 }
 
+void wrenFreeObj(WrenVM* vm, Obj* obj)
+{
+    static if (WREN_DEBUG_TRACE_MEMORY)
+    {
+        import core.stdc.stdio;
+        printf("free ");
+        printf (" @ %p\n", obj);
+    }
+
+    switch (obj.type)
+    {
+        case ObjType.OBJ_CLASS: {
+            wrenMethodBufferClear(vm, &(cast(ObjClass*)obj).methods);
+            break;
+        }
+        
+        case ObjType.OBJ_FIBER: {
+            ObjFiber* fiber = cast(ObjFiber*)obj;
+            DEALLOCATE(vm, fiber.frames);
+            DEALLOCATE(vm, fiber.stack);
+            break;
+        }
+        
+        case ObjType.OBJ_FN: {
+            ObjFn* fn = cast(ObjFn*)obj;
+            wrenValueBufferClear(vm, &fn.constants);
+            wrenByteBufferClear(vm, &fn.code);
+            wrenIntBufferClear(vm, &fn.debug_.sourceLines);
+            DEALLOCATE(vm, fn.debug_.name);
+            DEALLOCATE(vm, fn.debug_);
+            break;
+        }
+
+        case ObjType.OBJ_FOREIGN:
+            assert(0, "stub");
+        
+        case ObjType.OBJ_LIST:
+            wrenValueBufferClear(vm, &(cast(ObjList*)obj).elements);
+            break;
+        
+        case ObjType.OBJ_MAP:
+            DEALLOCATE(vm, (cast(ObjMap*)obj).entries);
+            break;
+        
+        case ObjType.OBJ_MODULE:
+            wrenSymbolTableClear(vm, &(cast(ObjModule*)obj).variableNames);
+            wrenValueBufferClear(vm, &(cast(ObjModule*)obj).variables);
+            break;
+        
+        case ObjType.OBJ_CLOSURE:
+        case ObjType.OBJ_INSTANCE:
+        case ObjType.OBJ_RANGE:
+        case ObjType.OBJ_STRING:
+        case ObjType.OBJ_UPVALUE:
+            break;
+        
+        default:
+            assert(0, "Unexpected object type");       
+    }
+}
 
 bool wrenValuesEqual(Value a, Value b)
 {

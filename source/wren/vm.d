@@ -1,9 +1,19 @@
 module wren.vm;
+import wren.core;
 import wren.common;
-import wren.value : ObjClass, ObjFiber, ObjMap, ObjModule, Obj, Value, wrenNewMap;
-import wren.utils : IntBuffer, ByteBuffer, SymbolTable, wrenSymbolTableInit;
+import wren.value;
+import wren.utils;
 
 @nogc:
+
+// The type of a primitive function.
+//
+// Primitives are similar to foreign functions, but have more direct access to
+// VM internals. It is passed the arguments in [args]. If it returns a value,
+// it places it in `args[0]` and returns `true`. If it causes a runtime error
+// or modifies the running fiber, it returns `false`.
+alias Primitive = bool function(WrenVM* vm, Value* args);
+
 // A generic allocation function that handles all explicit memory management
 // used by Wren. It's used like so:
 //
@@ -257,14 +267,6 @@ enum WrenType
 // at one time.
 enum WREN_MAX_TEMP_ROOTS = 8;
 
-struct WrenHandle
-{
-  Value value;
-
-  WrenHandle* prev;
-  WrenHandle* next;
-};
-
 struct WrenVM
 {
     ObjClass* boolClass;
@@ -418,14 +420,70 @@ WrenVM* wrenNewVM(WrenConfiguration* config)
     wrenSymbolTableInit(&vm.methodNames);
 
     vm.modules = wrenNewMap(vm);
-
+    wrenInitializeCore(vm);
     return vm;
+}
+
+void wrenFreeVM(WrenVM* vm)
+{
+    assert(vm.methodNames.count > 0, "VM appears to have already been freed.");
+
+    // Free all of the GC objects.
+    Obj* obj = vm.first;
+    while (obj != null)
+    {
+        Obj* next = obj.next;
+        wrenFreeObj(vm, obj);
+        obj = next;
+    }
+
+    // Free up the GC gray set.
+    vm.gray = cast(Obj**)vm.config.reallocateFn(vm.gray, 0, vm.config.userData);
+
+    // Tell the user if they didn't free any handles. We don't want to just free
+    // them here because the host app may still have pointers to them that they
+    // may try to use. Better to tell them about the bug early.
+    assert(vm.handles == null, "All handles have not been released.");
+
+    wrenSymbolTableClear(vm, &vm.methodNames);
+
+    DEALLOCATE(vm, vm);
 }
 
 void wrenCollectGarbage(WrenVM* vm)
 {
     
 }
+
+// Looks up the previously loaded module with [name].
+//
+// Returns `NULL` if no module with that name has been loaded.
+static ObjModule* getModule(WrenVM* vm, Value name)
+{
+  Value moduleValue = wrenMapGet(vm.modules, name);
+  return !IS_UNDEFINED(moduleValue) ? AS_MODULE(moduleValue) : null;
+}
+
+static Value getModuleVariable(WrenVM* vm, ObjModule* module_,
+                               Value variableName)
+{
+  ObjString* variable = AS_STRING(variableName);
+  uint variableEntry = wrenSymbolTableFind(&module_.variableNames,
+                                               variable.value.ptr,
+                                               variable.length);
+  
+  // It's a runtime error if the imported variable does not exist.
+  if (variableEntry != uint.max)
+  {
+    return module_.variables.data[variableEntry];
+  }
+  
+  vm.fiber.error = wrenStringFormat(vm,
+      "Could not find a variable named '@' in module '@'.",
+      variableName, OBJ_VAL(module_.name));
+  return NULL_VAL;
+}
+
 
 // A generic allocation function that handles all explicit memory management.
 // It's used like so:
@@ -472,6 +530,76 @@ void* wrenReallocate(WrenVM* vm, void* memory, size_t oldSize, size_t newSize)
     return vm.config.reallocateFn(memory, newSize, vm.config.userData);
 }
 
+Value wrenGetModuleVariable(WrenVM* vm, Value moduleName, Value variableName)
+{
+    ObjModule* module_ = getModule(vm, moduleName);
+    if (module_ == null)
+    {
+        vm.fiber.error = wrenStringFormat(vm, "Module '@' is not loaded.",
+                                            moduleName);
+        return NULL_VAL;
+    }
+    
+    return getModuleVariable(vm, module_, variableName);
+}
+
+Value wrenFindVariable(WrenVM* vm, ObjModule* module_, const char* name)
+{
+    import core.stdc.string : strlen;
+    int symbol = wrenSymbolTableFind(&module_.variableNames, name, strlen(name));
+    return module_.variables.data[symbol];
+}
+
+int wrenDeclareVariable(WrenVM* vm, ObjModule* module_, const char* name,
+                        size_t length, int line)
+{
+    if (module_.variables.count == MAX_MODULE_VARS) return -2;
+
+    // Implicitly defined variables get a "value" that is the line where the
+    // variable is first used. We'll use that later to report an error on the
+    // right line.
+    wrenValueBufferWrite(vm, &module_.variables, NUM_VAL(line));
+    return wrenSymbolTableAdd(vm, &module_.variableNames, name, length);
+}
+
+int wrenDefineVariable(WrenVM* vm, ObjModule* module_, const char* name,
+                       size_t length, Value value, int* line)
+{
+    if (module_.variables.count == MAX_MODULE_VARS) return -2;
+
+    if (IS_OBJ(value)) wrenPushRoot(vm, AS_OBJ(value));
+
+    // See if the variable is already explicitly or implicitly declared.
+    int symbol = wrenSymbolTableFind(&module_.variableNames, name, length);
+
+    if (symbol == -1)
+    {
+        // Brand new variable.
+        symbol = wrenSymbolTableAdd(vm, &module_.variableNames, name, length);
+        wrenValueBufferWrite(vm, &module_.variables, value);
+    }
+    else if (IS_NUM(module_.variables.data[symbol]))
+    {
+        // An implicitly declared variable's value will always be a number.
+        // Now we have a real definition.
+        if(line) *line = cast(int)AS_NUM(module_.variables.data[symbol]);
+        module_.variables.data[symbol] = value;
+
+        // If this was a localname we want to error if it was 
+        // referenced before this definition.
+        if (wrenIsLocalName(name)) symbol = -3;
+    }
+    else
+    {
+        // Already explicitly declared.
+        symbol = -1;
+    }
+
+    if (IS_OBJ(value)) wrenPopRoot(vm);
+
+    return symbol;
+}
+
 void wrenPushRoot(WrenVM* vm, Obj* obj)
 {
     assert(obj != null, "Cannot root NULL");
@@ -484,4 +612,9 @@ void wrenPopRoot(WrenVM* vm)
 {
     assert(vm.numTempRoots > 0, "No temporary roots to release.");
     vm.numTempRoots--;
+}
+
+static bool wrenIsLocalName(const(char)* name)
+{
+    return name[0] >= 'a' && name[0] <= 'z';
 }
