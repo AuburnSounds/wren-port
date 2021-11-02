@@ -1,0 +1,16 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/wren-d
+wren-d.so
+wren-d.dylib
+wren-d.dll
+wren-d.a
+*wren-d.a
+wren-d.lib
+wren-d-test-*
+*.exe
+*.o
+*.obj
+*.lst

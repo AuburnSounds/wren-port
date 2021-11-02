@@ -1,0 +1,6 @@
+name "embedding"
+description "A minimal D application."
+authors "Harrison Ford"
+copyright "Copyright © 2021, Harrison Ford"
+license "MIT"
+dependency "wren-d" path="../../"

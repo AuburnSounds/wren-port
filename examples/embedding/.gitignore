@@ -1,0 +1,15 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/embedding
+embedding.so
+embedding.dylib
+embedding.dll
+embedding.a
+embedding.lib
+embedding-test-*
+*.exe
+*.o
+*.obj
+*.lst
