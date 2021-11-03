@@ -24,7 +24,6 @@ bool bool_toString(WrenVM* vm, Value* args) @nogc
         return RETURN_VAL(args, CONST_STRING(vm, "false"));
     }
 }
-
 ///
 unittest
 {
@@ -48,10 +47,28 @@ unittest
     wrenFreeVM(vm);
 }
 
+@WrenPrimitive("Object metaclass", "same(_,_)")
+bool object_same(WrenVM* vm, Value* args) @nogc
+{
+    return RETURN_BOOL(args, wrenValuesEqual(args[1], args[2]));
+}
+
 @WrenPrimitive("Object", "!")
 bool object_not(WrenVM* vm, Value* args) @nogc
 {
     return RETURN_VAL(args, FALSE_VAL);
+}
+
+@WrenPrimitive("Object", "==(_)")
+bool object_eqeq(WrenVM* vm, Value* args) @nogc
+{
+    return RETURN_BOOL(args, wrenValuesEqual(args[0], args[1]));
+}
+
+@WrenPrimitive("Object", "!=(_)")
+bool object_bangeq(WrenVM* vm, Value* args) @nogc
+{
+    return RETURN_BOOL(args, !wrenValuesEqual(args[0], args[1]));
 }
 
 // Creates either the Object or Class class in the core module with [name].
@@ -112,5 +129,6 @@ void wrenInitializeCore(WrenVM* vm) @nogc
     // Do this after wiring up the metaclasses so objectMetaclass doesn't get
     // collected.
     wrenBindSuperclass(vm, objectMetaclass, vm.classClass);
+    registerPrimitives!("Object metaclass")(vm, objectMetaclass);
 
 }

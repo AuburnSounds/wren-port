@@ -62,7 +62,7 @@ struct Obj
     bool isDark;
 
     // The object's class.
-    void* classObj;
+    ObjClass* classObj;
 
     // The next object in the linked list of all currently allocated objects.
     Obj* next;
@@ -304,7 +304,13 @@ int wrenSymbolTableFind(const SymbolTable* symbols,
 
 void wrenBlackenSymbolTable(WrenVM* vm, SymbolTable* symbolTable) @nogc
 {
-    assert(0, "Stub");
+    for (int i = 0; i < symbolTable.count; i++)
+    {
+        wrenGrayObj(vm, &symbolTable.data[i].obj);
+    }
+
+    // Keep track of how much memory is still in use.
+    vm.bytesAllocated += symbolTable.capacity * (*symbolTable.data).sizeof;
 }
 
 // The dynamically allocated data structure for a variable that has been used
@@ -895,6 +901,9 @@ static Value wrenNumToValue(double num)
     }
 }
 
+// Validates that [arg] is a valid object for use as a map key. Returns true if
+// it is and returns false otherwise. Use validateKey usually, for a runtime error.
+// This separation exists to aid the API in surfacing errors to the developer as well.
 static bool wrenMapIsValidKey(Value arg)
 {
     return IS_BOOL(arg)
@@ -1163,6 +1172,7 @@ void wrenFunctionBindName(WrenVM* vm, ObjFn* fn, const(char)* name, int length)
     fn.debug_.name[length] = '\0';
 }
 
+// Creates a new instance of the given [classObj].
 Value wrenNewInstance(WrenVM* vm, ObjClass* classObj)
 {
     ObjInstance* instance = ALLOCATE_FLEX!(WrenVM, ObjInstance, Value)(vm, classObj.numFields);
@@ -1177,6 +1187,8 @@ Value wrenNewInstance(WrenVM* vm, ObjClass* classObj)
     return OBJ_VAL(instance);
 }
 
+// Creates a new list with [numElements] elements (which are left
+// uninitialized.)
 ObjList* wrenNewList(WrenVM* vm, uint numElements)
 {
     // Allocate this before the list object in case it triggers a GC which would
@@ -1195,6 +1207,7 @@ ObjList* wrenNewList(WrenVM* vm, uint numElements)
     return list;
 }
 
+// Inserts [value] in [list] at [index], shifting down the other elements.
 void wrenListInsert(WrenVM* vm, ObjList* list, Value value, uint index)
 {
     if (IS_OBJ(value)) wrenPushRoot(vm, AS_OBJ(value));
@@ -1214,6 +1227,7 @@ void wrenListInsert(WrenVM* vm, ObjList* list, Value value, uint index)
     list.elements.data[index] = value;
 }
 
+// Searches for [value] in [list], returns the index or -1 if not found.
 int wrenListIndexOf(WrenVM* vm, ObjList* list, Value value)
 {
     int count = list.elements.count;
@@ -1254,6 +1268,7 @@ Value wrenListRemoveAt(WrenVM* vm, ObjList* list, uint index)
     return removed;
 }
 
+// Creates a new empty map.
 ObjMap* wrenNewMap(WrenVM* vm)
 {
     ObjMap* map = ALLOCATE!(WrenVM, ObjMap)(vm);
@@ -1466,6 +1481,8 @@ static void resizeMap(WrenVM* vm, ObjMap* map, uint capacity)
     map.capacity = capacity;
 }
 
+// Looks up [key] in [map]. If found, returns the value. Otherwise, returns
+// `UNDEFINED_VAL`.
 Value wrenMapGet(ObjMap* map, Value key)
 {
     MapEntry* entry;
@@ -1474,6 +1491,7 @@ Value wrenMapGet(ObjMap* map, Value key)
     return UNDEFINED_VAL;
 }
 
+// Associates [key] with [value] in [map].
 void wrenMapSet(WrenVM* vm, ObjMap* map, Value key, Value value)
 {
     // If the map is getting too full, make room first.
@@ -1501,6 +1519,8 @@ void wrenMapClear(WrenVM* vm, ObjMap* map)
     map.count = 0;
 }
 
+// Removes [key] from [map], if present. Returns the value for the key if found
+// or `NULL_VAL` otherwise.
 Value wrenMapRemoveKey(WrenVM* vm, ObjMap* map, Value key)
 {
     MapEntry* entry;
@@ -1537,6 +1557,7 @@ Value wrenMapRemoveKey(WrenVM* vm, ObjMap* map, Value key)
     return value;
 }
 
+// Creates a new module.
 ObjModule* wrenNewModule(WrenVM* vm, ObjString* name)
 {
   ObjModule* module_ = ALLOCATE!(WrenVM, ObjModule)(vm);
@@ -1555,6 +1576,7 @@ ObjModule* wrenNewModule(WrenVM* vm, ObjString* name)
   return module_;
 }
 
+// Creates a new range from [from] to [to].
 Value wrenNewRange(WrenVM* vm, double from, double to, bool isInclusive)
 {
   ObjRange* range = ALLOCATE!(WrenVM, ObjRange)(vm);
@@ -1598,12 +1620,18 @@ static void hashString(ObjString* str)
     str.hash = hash;
 }
 
+// Creates a new string object and copies [text] into it.
+//
+// [text] must be non-NULL.
 Value wrenNewString(WrenVM* vm, const(char)* text)
 {
     import core.stdc.string : strlen;
     return wrenNewStringLength(vm, text, strlen(text));
 }
 
+// Creates a new string object of [length] and copies [text] into it.
+//
+// [text] may be NULL if [length] is zero.
 Value wrenNewStringLength(WrenVM* vm, const(char)* text, size_t length)
 {
     import core.stdc.string : memcpy;
@@ -1628,6 +1656,9 @@ Value CONST_STRING(WrenVM* vm, const(char)[] text)
     return wrenNewStringLength(vm, text.ptr, text.length);
 }
 
+// Creates a new string object by taking a range of characters from [source].
+// The range starts at [start], contains [count] bytes, and increments by
+// [step].
 Value wrenNewStringFromRange(WrenVM* vm, ObjString* source, int start,
                                  uint count, int step)
 {
@@ -1657,6 +1688,7 @@ Value wrenNewStringFromRange(WrenVM* vm, ObjString* source, int start,
     return OBJ_VAL(result);
 }
 
+// Produces a string representation of [value].
 Value wrenNumToString(WrenVM* vm, double value)
 {
     import std.math : isNaN, isInfinity;
@@ -1699,6 +1731,7 @@ Value wrenNumToString(WrenVM* vm, double value)
     return wrenNewStringLength(vm, buffer.ptr, length);
 }
 
+// Creates a new string containing the UTF-8 encoding of [value].
 Value wrenStringFromCodePoint(WrenVM* vm, int value)
 {
     int length = wrenUtf8EncodeNumBytes(value);
@@ -1712,6 +1745,7 @@ Value wrenStringFromCodePoint(WrenVM* vm, int value)
     return OBJ_VAL(str);
 }
 
+// Creates a new string from the integer representation of a byte
 Value wrenStringFromByte(WrenVM *vm, ubyte value)
 {
     int length = 1;
@@ -1721,6 +1755,15 @@ Value wrenStringFromByte(WrenVM *vm, ubyte value)
     return OBJ_VAL(str);
 }
 
+// Creates a new formatted string from [format] and any additional arguments
+// used in the format string.
+//
+// This is a very restricted flavor of formatting, intended only for internal
+// use by the VM. Two formatting characters are supported, each of which reads
+// the next argument as a certain type:
+//
+// $ - A C string.
+// @ - A Wren string object.
 Value wrenStringFormat(WrenVM* vm, const char* format, ...)
 {
     import core.stdc.stdarg;
@@ -1788,18 +1831,387 @@ Value wrenStringFormat(WrenVM* vm, const char* format, ...)
     return OBJ_VAL(result);
 }
 
+// Creates a new string containing the code point in [string] starting at byte
+// [index]. If [index] points into the middle of a UTF-8 sequence, returns an
+// empty string.
+Value wrenStringCodePointAt(WrenVM* vm, ObjString* string_, uint index)
+{
+    assert(index < string_.length, "Index out of bounds.");
+
+    int codePoint = wrenUtf8Decode(cast(ubyte*)string_.value + index,
+                                    string_.length - index);
+    if (codePoint == -1)
+    {
+        // If it isn't a valid UTF-8 sequence, treat it as a single raw byte.
+        char[2] bytes;
+        bytes[0] = string_.value[index];
+        bytes[1] = '\0';
+        return wrenNewStringLength(vm, bytes.ptr, 1);
+    }
+
+    return wrenStringFromCodePoint(vm, codePoint);
+}
+
+// Uses the Boyer-Moore-Horspool string matching algorithm.
+// Search for the first occurence of [needle] within [haystack] and returns its
+// zero-based offset. Returns `UINT32_MAX` if [haystack] does not contain
+// [needle].
+uint wrenStringFind(ObjString* haystack, ObjString* needle, uint start)
+{
+    // Edge case: An empty needle is always found.
+    if (needle.length == 0) return start;
+
+    // If the needle goes past the haystack it won't be found.
+    if (start + needle.length > haystack.length) return uint.max;
+
+    // If the startIndex is too far it also won't be found.
+    if (start >= haystack.length) return uint.max;
+
+    // Pre-calculate the shift table. For each character (8-bit value), we
+    // determine how far the search window can be advanced if that character is
+    // the last character in the haystack where we are searching for the needle
+    // and the needle doesn't match there.
+    uint[ubyte.max] shift;
+    uint needleEnd = needle.length - 1;
+
+    // By default, we assume the character is not the needle at all. In that case
+    // case, if a match fails on that character, we can advance one whole needle
+    // width since.
+    for (uint index = 0; index < ubyte.max; index++)
+    {
+        shift[index] = needle.length;
+    }
+
+    // Then, for every character in the needle, determine how far it is from the
+    // end. If a match fails on that character, we can advance the window such
+    // that it the last character in it lines up with the last place we could
+    // find it in the needle.
+    for (uint index = 0; index < needleEnd; index++)
+    {
+        char c = needle.value[index];
+        shift[cast(ubyte)c] = needleEnd - index;
+    }
+
+    // Slide the needle across the haystack, looking for the first match or
+    // stopping if the needle goes off the end.
+    char lastChar = needle.value[needleEnd];
+    uint range = haystack.length - needle.length;
+
+    for (uint index = start; index <= range; )
+    {
+        import core.stdc.string : memcmp;
+        // Compare the last character in the haystack's window to the last character
+        // in the needle. If it matches, see if the whole needle matches.
+        char c = haystack.value[index + needleEnd];
+        if (lastChar == c &&
+            memcmp(haystack.value.ptr + index, needle.value.ptr, needleEnd) == 0)
+        {
+            // Found a match.
+            return index;
+        }
+
+        // Otherwise, slide the needle forward.
+        index += shift[cast(ubyte)c];
+    }
+
+    // Not found.
+    return uint.max;
+}
+
+// Returns true if [a] and [b] represent the same string.
 static bool wrenStringEqualsCString(ObjString* a, const(char)* b, size_t length)
 {
     import core.stdc.string : memcmp;
     return a.length == length && memcmp(a.value.ptr, b, length) == 0;
 }
 
+// Creates a new open upvalue pointing to [value] on the stack.
+ObjUpvalue* wrenNewUpvalue(WrenVM* vm, Value* value)
+{
+    ObjUpvalue* upvalue = ALLOCATE!(WrenVM, ObjUpvalue)(vm);
+
+    // Upvalues are never used as first-class objects, so don't need a class.
+    initObj(vm, &upvalue.obj, ObjType.OBJ_UPVALUE, null);
+
+    upvalue.value = value;
+    upvalue.closed = NULL_VAL;
+    upvalue.next = null;
+
+    return upvalue;
+}
+
+// Mark [obj] as reachable and still in use. This should only be called
+// during the sweep phase of a garbage collection.
+void wrenGrayObj(WrenVM* vm, Obj* obj)
+{
+    if (obj == null) return;
+
+    // Stop if the object is already darkened so we don't get stuck in a cycle.
+    if (obj.isDark) return;
+
+    // It's been reached.
+    obj.isDark = true;
+
+    // Add it to the gray list so it can be recursively explored for
+    // more marks later.
+    if (vm.grayCount >= vm.grayCapacity)
+    {
+        vm.grayCapacity = vm.grayCount * 2;
+        vm.gray = cast(Obj**)vm.config.reallocateFn(vm.gray,
+                                                vm.grayCapacity * (Obj*).sizeof,
+                                                vm.config.userData);
+    }
+
+    vm.gray[vm.grayCount++] = obj;
+}
+
+// Mark [value] as reachable and still in use. This should only be called
+// during the sweep phase of a garbage collection.
+void wrenGrayValue(WrenVM* vm, Value value)
+{
+    if (!IS_OBJ(value)) return;
+    wrenGrayObj(vm, AS_OBJ(value));
+}
+
+// Mark the values in [buffer] as reachable and still in use. This should only
+// be called during the sweep phase of a garbage collection.
+void wrenGrayBuffer(WrenVM* vm, ValueBuffer* buffer)
+{
+    for (int i = 0; i < buffer.count; i++)
+    {
+        wrenGrayValue(vm, buffer.data[i]);
+    }
+}
+
+static void blackenClass(WrenVM* vm, ObjClass* classObj)
+{
+    // The metaclass.
+    wrenGrayObj(vm, cast(Obj*)classObj.obj.classObj);
+
+    // The superclass.
+    wrenGrayObj(vm, cast(Obj*)classObj.superclass);
+
+    // Method function objects.
+    for (int i = 0; i < classObj.methods.count; i++)
+    {
+        if (classObj.methods.data[i].type == MethodType.METHOD_BLOCK)
+        {
+        wrenGrayObj(vm, cast(Obj*)classObj.methods.data[i].as.closure);
+        }
+    }
+
+    wrenGrayObj(vm, cast(Obj*)classObj.name);
+
+    if(!IS_NULL(classObj.attributes)) wrenGrayObj(vm, AS_OBJ(classObj.attributes));
+
+    // Keep track of how much memory is still in use.
+    vm.bytesAllocated += ObjClass.sizeof;
+    vm.bytesAllocated += classObj.methods.capacity * Method.sizeof;
+}
+
+static void blackenClosure(WrenVM* vm, ObjClosure* closure)
+{
+    // Mark the function.
+    wrenGrayObj(vm, cast(Obj*)closure.fn);
+
+    // Mark the upvalues.
+    for (int i = 0; i < closure.fn.numUpvalues; i++)
+    {
+        wrenGrayObj(vm, cast(Obj*)closure.upvalues[i]);
+    }
+
+    // Keep track of how much memory is still in use.
+    vm.bytesAllocated += ObjClosure.sizeof;
+    vm.bytesAllocated += (ObjUpvalue*).sizeof * closure.fn.numUpvalues;
+}
+
+static void blackenFiber(WrenVM* vm, ObjFiber* fiber)
+{
+  // Stack functions.
+  for (int i = 0; i < fiber.numFrames; i++)
+  {
+    wrenGrayObj(vm, cast(Obj*)fiber.frames[i].closure);
+  }
+
+  // Stack variables.
+  for (Value* slot = fiber.stack; slot < fiber.stackTop; slot++)
+  {
+    wrenGrayValue(vm, *slot);
+  }
+
+  // Open upvalues.
+  ObjUpvalue* upvalue = fiber.openUpvalues;
+  while (upvalue != null)
+  {
+    wrenGrayObj(vm, cast(Obj*)upvalue);
+    upvalue = upvalue.next;
+  }
+
+  // The caller.
+  wrenGrayObj(vm, cast(Obj*)fiber.caller);
+  wrenGrayValue(vm, fiber.error);
+
+  // Keep track of how much memory is still in use.
+  vm.bytesAllocated += ObjFiber.sizeof;
+  vm.bytesAllocated += fiber.frameCapacity * CallFrame.sizeof;
+  vm.bytesAllocated += fiber.stackCapacity * Value.sizeof;
+}
+
+static void blackenFn(WrenVM* vm, ObjFn* fn)
+{
+  // Mark the constants.
+  wrenGrayBuffer(vm, &fn.constants);
+
+  // Keep track of how much memory is still in use.
+  vm.bytesAllocated += ObjFn.sizeof;
+  vm.bytesAllocated += ubyte.sizeof * fn.code.capacity;
+  vm.bytesAllocated += Value.sizeof * fn.constants.capacity;
+  
+  // The debug line number buffer.
+  vm.bytesAllocated += int.sizeof * fn.code.capacity;
+  // TODO: What about the function name?
+}
+
+static void blackenForeign(WrenVM* vm, ObjForeign* foreign)
+{
+  // TODO: Keep track of how much memory the foreign object uses. We can store
+  // this in each foreign object, but it will balloon the size. We may not want
+  // that much overhead. One option would be to let the foreign class register
+  // a C function that returns a size for the object. That way the VM doesn't
+  // always have to explicitly store it.
+}
+
+static void blackenInstance(WrenVM* vm, ObjInstance* instance)
+{
+  wrenGrayObj(vm, cast(Obj*)instance.obj.classObj);
+
+  // Mark the fields.
+  for (int i = 0; i < instance.obj.classObj.numFields; i++)
+  {
+    wrenGrayValue(vm, instance.fields[i]);
+  }
+
+  // Keep track of how much memory is still in use.
+  vm.bytesAllocated += ObjInstance.sizeof;
+  vm.bytesAllocated += Value.sizeof * instance.obj.classObj.numFields;
+}
+
+static void blackenList(WrenVM* vm, ObjList* list)
+{
+  // Mark the elements.
+  wrenGrayBuffer(vm, &list.elements);
+
+  // Keep track of how much memory is still in use.
+  vm.bytesAllocated += ObjList.sizeof;
+  vm.bytesAllocated += Value.sizeof * list.elements.capacity;
+}
+
+static void blackenMap(WrenVM* vm, ObjMap* map)
+{
+  // Mark the entries.
+  for (uint i = 0; i < map.capacity; i++)
+  {
+    MapEntry* entry = &map.entries[i];
+    if (IS_UNDEFINED(entry.key)) continue;
+
+    wrenGrayValue(vm, entry.key);
+    wrenGrayValue(vm, entry.value);
+  }
+
+  // Keep track of how much memory is still in use.
+  vm.bytesAllocated += ObjMap.sizeof;
+  vm.bytesAllocated += MapEntry.sizeof * map.capacity;
+}
+
+static void blackenModule(WrenVM* vm, ObjModule* module_)
+{
+  // Top-level variables.
+  for (int i = 0; i < module_.variables.count; i++)
+  {
+    wrenGrayValue(vm, module_.variables.data[i]);
+  }
+
+  wrenBlackenSymbolTable(vm, &module_.variableNames);
+
+  wrenGrayObj(vm, cast(Obj*)module_.name);
+
+  // Keep track of how much memory is still in use.
+  vm.bytesAllocated += ObjModule.sizeof;
+}
+
+static void blackenRange(WrenVM* vm, ObjRange* range)
+{
+  // Keep track of how much memory is still in use.
+  vm.bytesAllocated += ObjRange.sizeof;
+}
+
+static void blackenString(WrenVM* vm, ObjString* str)
+{
+  // Keep track of how much memory is still in use.
+  vm.bytesAllocated += ObjString.sizeof + str.length + 1;
+}
+
+static void blackenUpvalue(WrenVM* vm, ObjUpvalue* upvalue)
+{
+    // Mark the closed-over object (in case it is closed).
+    wrenGrayValue(vm, upvalue.closed);
+
+    // Keep track of how much memory is still in use.
+    vm.bytesAllocated += ObjUpvalue.sizeof;
+}
+
+static void blackenObject(WrenVM* vm, Obj* obj)
+{
+    static if (WREN_DEBUG_TRACE_MEMORY)
+    {
+        import core.stdc.stdio : printf;
+        import wren.dbg : wrenDumpValue;
+        printf("mark ");
+        wrenDumpValue(OBJ_VAL(obj));
+        printf(" @ %p\n", obj);
+    }
+
+    // Traverse the object's fields.
+    switch (obj.type) with(ObjType)
+    {
+        case OBJ_CLASS:    blackenClass(   vm, cast(ObjClass*)   obj); break;
+        case OBJ_CLOSURE:  blackenClosure( vm, cast(ObjClosure*) obj); break;
+        case OBJ_FIBER:    blackenFiber(   vm, cast(ObjFiber*)   obj); break;
+        case OBJ_FN:       blackenFn(      vm, cast(ObjFn*)      obj); break;
+        case OBJ_FOREIGN:  blackenForeign( vm, cast(ObjForeign*) obj); break;
+        case OBJ_INSTANCE: blackenInstance(vm, cast(ObjInstance*)obj); break;
+        case OBJ_LIST:     blackenList(    vm, cast(ObjList*)    obj); break;
+        case OBJ_MAP:      blackenMap(     vm, cast(ObjMap*)     obj); break;
+        case OBJ_MODULE:   blackenModule(  vm, cast(ObjModule*)  obj); break;
+        case OBJ_RANGE:    blackenRange(   vm, cast(ObjRange*)   obj); break;
+        case OBJ_STRING:   blackenString(  vm, cast(ObjString*)  obj); break;
+        case OBJ_UPVALUE:  blackenUpvalue( vm, cast(ObjUpvalue*) obj); break;
+        default: assert(0, "Unexpected object type");
+    }
+}
+
+// Processes every object in the gray stack until all reachable objects have
+// been marked. After that, all objects are either white (freeable) or black
+// (in use and fully traversed).
+void wrenBlackenObjects(WrenVM* vm)
+{
+    while (vm.grayCount > 0)
+    {
+        // Pop an item from the gray stack.
+        Obj* obj = vm.gray[--vm.grayCount];
+        blackenObject(vm, obj);
+    }
+}
+
+// Releases all memory owned by [obj], including [obj] itself.
 void wrenFreeObj(WrenVM* vm, Obj* obj)
 {
     static if (WREN_DEBUG_TRACE_MEMORY)
     {
         import core.stdc.stdio;
+        import wren.dbg : wrenDumpValue;
         printf("free ");
+        wrenDumpValue(OBJ_VAL(obj));
         printf (" @ %p\n", obj);
     }
 
@@ -1855,6 +2267,9 @@ void wrenFreeObj(WrenVM* vm, Obj* obj)
     }
 }
 
+// Returns true if [a] and [b] are equivalent. Immutable values (null, bools,
+// numbers, ranges, and strings) are equal if they have the same data. All
+// other values are equal if they are identical objects.
 bool wrenValuesEqual(Value a, Value b)
 {
     if (wrenValuesSame(a, b)) return true;

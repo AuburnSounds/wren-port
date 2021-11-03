@@ -345,7 +345,8 @@ struct WrenVM
     // The compiler that is currently compiling code. This is used so that heap
     // allocated objects used by the compiler can be found if a GC is kicked off
     // in the middle of a compile.
-    void* compiler;
+    import wren.compiler : Compiler;
+    Compiler* compiler;
 
     // There is a single global symbol table for all method names on all classes.
     // Method calls are dispatched directly by index in this table.
@@ -452,7 +453,95 @@ void wrenFreeVM(WrenVM* vm)
 
 void wrenCollectGarbage(WrenVM* vm)
 {
-    
+    static if (WREN_DEBUG_TRACE_MEMORY || WREN_DEBUG_TRACE_GC)
+    {
+        import core.stdc.stdio : printf;
+        import core.stdc.time;
+        printf("-- gc --\n");
+
+        size_t before = vm.bytesAllocated;
+        double startTime = cast(double)clock() / CLOCKS_PER_SEC;
+    }
+
+    // Mark all reachable objects.
+
+    // Reset this. As we mark objects, their size will be counted again so that
+    // we can track how much memory is in use without needing to know the size
+    // of each *freed* object.
+    //
+    // This is important because when freeing an unmarked object, we don't always
+    // know how much memory it is using. For example, when freeing an instance,
+    // we need to know its class to know how big it is, but its class may have
+    // already been freed.
+    vm.bytesAllocated = 0;
+
+    wrenGrayObj(vm, cast(Obj*)vm.modules);
+
+    // Temporary roots.
+    for (int i = 0; i < vm.numTempRoots; i++)
+    {
+        wrenGrayObj(vm, vm.tempRoots[i]);
+    }
+
+    // The current fiber.
+    wrenGrayObj(vm, cast(Obj*)vm.fiber);
+
+    // The handles.
+    for (WrenHandle* handle = vm.handles;
+        handle != null;
+        handle = handle.next)
+    {
+        wrenGrayValue(vm, handle.value);
+    }
+
+    // Any object the compiler is using (if there is one).
+    import wren.compiler : wrenMarkCompiler;
+    if (vm.compiler != null) wrenMarkCompiler(vm, vm.compiler);
+
+    // Method names.
+    wrenBlackenSymbolTable(vm, &vm.methodNames);
+
+    // Now that we have grayed the roots, do a depth-first search over all of the
+    // reachable objects.
+    wrenBlackenObjects(vm);
+
+    // Collect the white objects.
+    Obj** obj = &vm.first;
+    while (*obj != null)
+    {
+        if (!((*obj).isDark))
+        {
+            // This object wasn't reached, so remove it from the list and free it.
+            Obj* unreached = *obj;
+            *obj = unreached.next;
+            wrenFreeObj(vm, unreached);
+        }
+        else
+        {
+            // This object was reached, so unmark it (for the next GC) and move on to
+            // the next.
+            (*obj).isDark = false;
+            obj = &(*obj).next;
+        }
+    }
+
+    // Calculate the next gc point, this is the current allocation plus
+    // a configured percentage of the current allocation.
+    vm.nextGC = vm.bytesAllocated + ((vm.bytesAllocated * vm.config.heapGrowthPercent) / 100);
+    if (vm.nextGC < vm.config.minHeapSize) vm.nextGC = vm.config.minHeapSize;
+
+    static if (WREN_DEBUG_TRACE_MEMORY || WREN_DEBUG_TRACE_GC)
+    {
+        double elapsed = (cast(double)clock / CLOCKS_PER_SEC) - startTime;
+        // Explicit cast because size_t has different sizes on 32-bit and 64-bit and
+        // we need a consistent type for the format string.
+        printf("GC %lu before, %lu after (%lu collected), next at %lu. Took %.3fms.\n",
+            cast(ulong)before,
+            cast(ulong)vm.bytesAllocated,
+            cast(ulong)(before - vm.bytesAllocated),
+            cast(ulong)vm.nextGC,
+            elapsed*1000.0);
+    }
 }
 
 // Looks up the previously loaded module with [name].
