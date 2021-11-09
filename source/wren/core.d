@@ -86,10 +86,10 @@ static ObjClass* defineClass(WrenVM* vm, ObjModule* module_, const(char)* name) 
 }
 
 private void registerPrimitives(string className)(WrenVM* vm, ObjClass* classObj) {
-    static foreach(_mem; __traits(allMembers, wren.core))
+    static foreach(_mem; __traits(allMembers, mixin(__MODULE__)))
     {{
         import std.traits : getUDAs, hasUDA;
-        alias member = __traits(getMember, wren.core, _mem);
+        alias member = __traits(getMember, mixin(__MODULE__), _mem);
         static if (hasUDA!(member, WrenPrimitive)) {
             enum primDef = getUDAs!(member, WrenPrimitive)[0];
             static if (primDef.className == className) {

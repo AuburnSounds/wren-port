@@ -18,3 +18,8 @@ static ulong wrenDoubleToBits(double num)
 {
     return *cast(ulong*)&num;
 }
+
+// no-floating-point abs
+auto abs(Num)(Num x) {
+    return x >= 0 ? x : -x;
+}
