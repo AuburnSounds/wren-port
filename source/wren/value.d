@@ -749,13 +749,13 @@ static if (WREN_NAN_TAGGING)
     enum TAG_UNUSED3 = 6;
     enum TAG_UNUSED4 = 7;
 
-    // Value -> 0 or 1.
+    // Value . 0 or 1.
     bool AS_BOOL(Value value)
     {
         return ((value) == TRUE_VAL);
     }
 
-    // Value -> Obj*.
+    // Value . Obj*.
     Obj* AS_OBJ(Value value)
     {
         return (cast(Obj*)cast(ulong)((value) & ~(SIGN_BIT | QNAN)));
@@ -774,13 +774,13 @@ static if (WREN_NAN_TAGGING)
 }
 else
 {
-    // Value -> 0 or 1.
+    // Value . 0 or 1.
     bool AS_BOOL(Value value)
     {
         return ((value).type = VAL_TRUE);
     }
 
-    // Value -> Obj*.
+    // Value . Obj*.
     Obj* AS_OBJ(Value value)
     {
         return ((value).as.obj);
@@ -993,7 +993,35 @@ void wrenBindSuperclass(WrenVM* vm, ObjClass* subclass, ObjClass* superclass)
 ObjClass* wrenNewClass(WrenVM* vm, ObjClass* superclass, int numFields,
                             ObjString* name)
 {
-    assert(0, "Stub");
+    // Create the metaclass.
+    Value metaclassName = wrenStringFormat(vm, "@ metaclass".ptr, OBJ_VAL(name));
+    wrenPushRoot(vm, AS_OBJ(metaclassName));
+
+    ObjClass* metaclass = wrenNewSingleClass(vm, 0, AS_STRING(metaclassName));
+    metaclass.obj.classObj = vm.classClass;
+
+    wrenPopRoot(vm);
+
+    // Make sure the metaclass isn't collected when we allocate the class.
+    wrenPushRoot(vm, cast(Obj*)metaclass);
+
+    // Metaclasses always inherit Class and do not parallel the non-metaclass
+    // hierarchy.
+    wrenBindSuperclass(vm, metaclass, vm.classClass);
+
+    ObjClass* classObj = wrenNewSingleClass(vm, numFields, name);
+
+    // Make sure the class isn't collected while the inherited methods are being
+    // bound.
+    wrenPushRoot(vm, cast(Obj*)classObj);
+
+    classObj.obj.classObj = metaclass;
+    wrenBindSuperclass(vm, classObj, superclass);
+
+    wrenPopRoot(vm);
+    wrenPopRoot(vm);
+
+    return classObj;
 }
 
 void wrenBindMethod(WrenVM* vm, ObjClass* classObj, int symbol, Method method)
@@ -1764,67 +1792,72 @@ Value wrenStringFromByte(WrenVM *vm, ubyte value)
 //
 // $ - A C string.
 // @ - A Wren string object.
-Value wrenStringFormat(WrenVM* vm, const char* format, ...)
+extern(C) Value wrenStringFormat(WrenVM* vm, const(char)* format, ...)
 {
-    import core.stdc.stdarg;
+    import core.stdc.stdarg : va_start, va_arg, va_end, va_list, va_copy;
     import core.stdc.string : strlen, memcpy;
-    va_list argList;
 
     // Calculate the length of the result string. Do this up front so we can
     // create the final string with a single allocation.
-    va_start(argList, format);
+    // Work-around nasty compiler bug here. Apparently va_args doesn't get reset.
+    va_list v1;
+    va_start(v1, format);
+    va_list v2;
+    va_copy(v2, v1);
     size_t totalLength = 0;
+
     for (const(char)* c = format; *c != '\0'; c++)
     {
         switch (*c)
         {
-        case '$':
-            totalLength += strlen(va_arg!(const(char*))(argList));
-            break;
+            case '$':
+                totalLength += strlen(va_arg!(const(char*))(v2));
+                break;
 
-        case '@':
-            totalLength += AS_STRING(va_arg!(Value)(argList)).length;
-            break;
+            case '@':
+                totalLength += AS_STRING(va_arg!(Value)(v2)).length;
+                break;
 
-        default:
-            // Any other character is interpreted literally.
-            totalLength++;
+            default:
+                // Any other character is interpreted literally.
+                totalLength++;
         }
     }
-    va_end(argList);
+    va_end(v2);
 
     // Concatenate the string.
     ObjString* result = allocateString(vm, totalLength);
 
-    va_start(argList, format);
+    //va_start(_argptr, format);
     char* start = result.value.ptr;
     for (const(char)* c = format; *c != '\0'; c++)
     {
         switch (*c)
         {
-        case '$':
-        {
-            const char* str = va_arg!(const(char)*)(argList);
-            size_t length = strlen(str);
-            memcpy(start, str, length);
-            start += length;
-            break;
-        }
+            case '$':
+            {
+                const(char)* str = va_arg!(const(char)*)(v1);
+                size_t length = strlen(str);
+                memcpy(start, str, length);
+                start += length;
+                break;
+            }
 
-        case '@':
-        {
-            ObjString* str = AS_STRING(va_arg!(Value)(argList));
-            memcpy(start, str.value.ptr, str.length);
-            start += str.length;
-            break;
-        }
+            case '@':
+            {
+                Value v = va_arg!(Value)(v1);
+                ObjString* str = AS_STRING(v);
+                memcpy(start, str.value.ptr, str.length);
+                start += str.length;
+                break;
+            }
 
-        default:
-            // Any other character is interpreted literally.
-            *start++ = *c;
-        }
+            default:
+                // Any other character is interpreted literally.
+                *start++ = *c;
+            }
     }
-    va_end(argList);
+    va_end(v1);
 
     hashString(result);
 

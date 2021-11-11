@@ -4,7 +4,7 @@ import wren.value;
 import wren.vm;
 
 // The core module source
-static immutable const(char)[] coreModuleSource = import("wren_core.wren");
+static const(char)[] coreModuleSource = import("wren_core.wren");
 
 @WrenPrimitive("Bool", "!") 
 bool bool_not(WrenVM* vm, Value* args) @nogc
@@ -71,6 +71,62 @@ bool object_bangeq(WrenVM* vm, Value* args) @nogc
     return RETURN_BOOL(args, !wrenValuesEqual(args[0], args[1]));
 }
 
+@WrenPrimitive("Object", "is(_)")
+bool object_is(WrenVM* vm, Value* args) @nogc
+{
+    if (!IS_CLASS(args[1]))
+    {
+        return RETURN_ERROR(vm, "Right operand must be a class.");
+    }
+
+    ObjClass *classObj = wrenGetClass(vm, args[0]);
+    ObjClass *baseClassObj = AS_CLASS(args[1]);
+
+    // Walk the superclass chain looking for the class.
+    do
+    {
+        if (baseClassObj == classObj) {
+            return RETURN_BOOL(args, true);
+        }
+
+        classObj = classObj.superclass;
+    }
+    while (classObj != null);
+
+    return RETURN_BOOL(args, false);
+}
+
+@WrenPrimitive("Object", "toString")
+bool object_toString(WrenVM* vm, Value* args) @nogc
+{
+    Obj* obj = AS_OBJ(args[0]);
+    Value name = OBJ_VAL(obj.classObj.name);
+    return RETURN_VAL(args, wrenStringFormat(vm, "instance of @", name));
+}
+
+@WrenPrimitive("Object", "type")
+bool object_type(WrenVM* vm, Value* args) @nogc
+{
+    return RETURN_OBJ(args, wrenGetClass(vm, args[0]));
+}
+
+@WrenPrimitive("String", "toString")
+bool string_toString(WrenVM* vm, Value* args) @nogc
+{
+    return RETURN_VAL(args, args[0]);
+}
+
+@WrenPrimitive("System", "writeString_(_)")
+bool system_writeString(WrenVM* vm, Value* args) @nogc
+{
+    if (vm.config.writeFn != null)
+    {
+        vm.config.writeFn(vm, AS_CSTRING(args[1]));
+    }
+
+    return RETURN_VAL(args, args[1]);
+}
+
 // Creates either the Object or Class class in the core module with [name].
 static ObjClass* defineClass(WrenVM* vm, ObjModule* module_, const(char)* name) @nogc
 {
@@ -131,4 +187,51 @@ void wrenInitializeCore(WrenVM* vm) @nogc
     wrenBindSuperclass(vm, objectMetaclass, vm.classClass);
     registerPrimitives!("Object metaclass")(vm, objectMetaclass);
 
+    // The core class diagram ends up looking like this, where single lines point
+    // to a class's superclass, and double lines point to its metaclass:
+    //
+    //        .------------------------------------. .====.
+    //        |                  .---------------. | #    #
+    //        v                  |               v | v    #
+    //   .---------.   .-------------------.   .-------.  #
+    //   | Object  |==>| Object metaclass  |==>| Class |=="
+    //   '---------'   '-------------------'   '-------'
+    //        ^                                 ^ ^ ^ ^
+    //        |                  .--------------' # | #
+    //        |                  |                # | #
+    //   .---------.   .-------------------.      # | # -.
+    //   |  Base   |==>|  Base metaclass   |======" | #  |
+    //   '---------'   '-------------------'        | #  |
+    //        ^                                     | #  |
+    //        |                  .------------------' #  | Example classes
+    //        |                  |                    #  |
+    //   .---------.   .-------------------.          #  |
+    //   | Derived |==>| Derived metaclass |=========="  |
+    //   '---------'   '-------------------'            -'
+
+    // The rest of the classes can now be defined normally.
+    wrenInterpret(vm, null, coreModuleSource.ptr);
+
+    vm.boolClass = AS_CLASS(wrenFindVariable(vm, coreModule, "Bool"));
+    registerPrimitives!("Bool")(vm, vm.boolClass);
+
+    vm.stringClass = AS_CLASS(wrenFindVariable(vm, coreModule, "String"));
+    registerPrimitives!("String")(vm, vm.stringClass);
+
+    ObjClass* systemClass = AS_CLASS(wrenFindVariable(vm, coreModule, "System"));
+    registerPrimitives!("System")(vm, systemClass.obj.classObj);
+
+
+    // While bootstrapping the core types and running the core module, a number
+    // of string objects have been created, many of which were instantiated
+    // before stringClass was stored in the VM. Some of them *must* be created
+    // first -- the ObjClass for string itself has a reference to the ObjString
+    // for its name.
+    //
+    // These all currently have a NULL classObj pointer, so go back and assign
+    // them now that the string class is known.
+    for (Obj* obj = vm.first; obj != null; obj = obj.next)
+    {
+        if (obj.type == ObjType.OBJ_STRING) obj.classObj = vm.stringClass;
+    }
 }

@@ -1,4 +1,5 @@
 import core.stdc.stdio;
+import wren.compiler;
 import wren.vm;
 
 static void writeFn(WrenVM* vm, const(char)* text) @nogc
@@ -43,5 +44,21 @@ void main()
 	config.errorFn = &errorFn;
 	
 	WrenVM* vm = wrenNewVM(&config);
+
+	const(char)* module_ = "main";
+	const(char)* script = "System.print(\"I am running in a VM!\")";
+
+	WrenInterpretResult result = wrenInterpret(vm, module_, script);
+	switch (result) with(WrenInterpretResult)
+	{
+		case WREN_RESULT_COMPILE_ERROR:
+		{ printf("Compile Error!\n"); } break;
+		case WREN_RESULT_RUNTIME_ERROR:
+		{ printf("Runtime Error!\n"); } break;
+		case WREN_RESULT_SUCCESS:
+		{ printf("Success!\n"); } break;
+		default:
+			assert(0);
+	}
 	// TODO: when more functions are implemented, we can work on it from there
 }

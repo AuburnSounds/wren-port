@@ -1,8 +1,11 @@
 module wren.dbg;
 import core.stdc.stdio : printf;
 import wren.common;
+import wren.opcodes;
 import wren.value;
 import wren.vm;
+
+@nogc:
 
 void wrenDebugPrintStackTrace(WrenVM* vm)
 {
@@ -110,7 +113,261 @@ void wrenDumpValue(Value value)
 
 static int dumpInstruction(WrenVM* vm, ObjFn* fn, int i, int* lastLine)
 {
-    assert(0, "stub");
+    int start = i;
+    ubyte* bytecode = fn.code.data;
+    Code code = cast(Code)bytecode[i];
+
+    int line = fn.debug_.sourceLines.data[i];
+    if (lastLine == null || *lastLine != line)
+    {
+        printf("%4d:", line);
+        if (lastLine != null) *lastLine = line;
+    }
+    else
+    {
+        printf("     ");
+    }
+
+    printf(" %04d  ", i++);
+
+    ubyte READ_BYTE() {
+        return bytecode[i++];
+    }
+
+    ushort READ_SHORT() {
+        i += 2;
+        return (bytecode[i - 2] << 8 | bytecode[i - 1]);
+    }
+
+    auto BYTE_INSTRUCTION(const(char)[] instr) {
+        return "printf(\"%-16s %5d\n\", \"" ~ instr ~ "\".ptr, READ_BYTE()); break;";
+    }
+
+    switch (code) with (Code)
+    {
+        case CODE_CONSTANT:
+        {
+            int constant = READ_SHORT();
+            printf("%-16s %5d '", "CONSTANT".ptr, constant);
+            wrenDumpValue(fn.constants.data[constant]);
+            printf("'\n");
+            break;
+        }
+
+        case CODE_NULL:  printf("NULL\n"); break;
+        case CODE_FALSE: printf("FALSE\n"); break;
+        case CODE_TRUE:  printf("TRUE\n"); break;
+
+        case CODE_LOAD_LOCAL_0: printf("LOAD_LOCAL_0\n"); break;
+        case CODE_LOAD_LOCAL_1: printf("LOAD_LOCAL_1\n"); break;
+        case CODE_LOAD_LOCAL_2: printf("LOAD_LOCAL_2\n"); break;
+        case CODE_LOAD_LOCAL_3: printf("LOAD_LOCAL_3\n"); break;
+        case CODE_LOAD_LOCAL_4: printf("LOAD_LOCAL_4\n"); break;
+        case CODE_LOAD_LOCAL_5: printf("LOAD_LOCAL_5\n"); break;
+        case CODE_LOAD_LOCAL_6: printf("LOAD_LOCAL_6\n"); break;
+        case CODE_LOAD_LOCAL_7: printf("LOAD_LOCAL_7\n"); break;
+        case CODE_LOAD_LOCAL_8: printf("LOAD_LOCAL_8\n"); break;
+
+        case CODE_LOAD_LOCAL: {
+            mixin (BYTE_INSTRUCTION("LOAD_LOCAL"));
+        }
+        case CODE_STORE_LOCAL: mixin (BYTE_INSTRUCTION("STORE_LOCAL"));
+        case CODE_LOAD_UPVALUE: mixin (BYTE_INSTRUCTION("LOAD_UPVALUE"));
+        case CODE_STORE_UPVALUE: mixin (BYTE_INSTRUCTION("STORE_UPVALUE"));
+
+        case CODE_LOAD_MODULE_VAR:
+        {
+            int slot = READ_SHORT();
+            printf("%-16s %5d '%s'\n", "LOAD_MODULE_VAR".ptr, slot,
+                    fn.module_.variableNames.data[slot].value.ptr);
+            break;
+        }
+
+        case CODE_STORE_MODULE_VAR:
+        {
+            int slot = READ_SHORT();
+            printf("%-16s %5d '%s'\n", "STORE_MODULE_VAR".ptr, slot,
+                    fn.module_.variableNames.data[slot].value.ptr);
+            break;
+        }
+
+        case CODE_LOAD_FIELD_THIS: mixin (BYTE_INSTRUCTION("LOAD_FIELD_THIS"));
+        case CODE_STORE_FIELD_THIS: mixin (BYTE_INSTRUCTION("STORE_FIELD_THIS"));
+        case CODE_LOAD_FIELD: mixin (BYTE_INSTRUCTION("LOAD_FIELD"));
+        case CODE_STORE_FIELD: mixin (BYTE_INSTRUCTION("STORE_FIELD"));
+
+        case CODE_POP: printf("POP\n"); break;
+
+        case CODE_CALL_0:
+        case CODE_CALL_1:
+        case CODE_CALL_2:
+        case CODE_CALL_3:
+        case CODE_CALL_4:
+        case CODE_CALL_5:
+        case CODE_CALL_6:
+        case CODE_CALL_7:
+        case CODE_CALL_8:
+        case CODE_CALL_9:
+        case CODE_CALL_10:
+        case CODE_CALL_11:
+        case CODE_CALL_12:
+        case CODE_CALL_13:
+        case CODE_CALL_14:
+        case CODE_CALL_15:
+        case CODE_CALL_16:
+        {
+            int numArgs = bytecode[i - 1] - CODE_CALL_0;
+            int symbol = READ_SHORT();
+            printf("CALL_%-11d %5d '%s'\n", numArgs, symbol,
+                    vm.methodNames.data[symbol].value.ptr);
+            break;
+        }
+
+        case CODE_SUPER_0:
+        case CODE_SUPER_1:
+        case CODE_SUPER_2:
+        case CODE_SUPER_3:
+        case CODE_SUPER_4:
+        case CODE_SUPER_5:
+        case CODE_SUPER_6:
+        case CODE_SUPER_7:
+        case CODE_SUPER_8:
+        case CODE_SUPER_9:
+        case CODE_SUPER_10:
+        case CODE_SUPER_11:
+        case CODE_SUPER_12:
+        case CODE_SUPER_13:
+        case CODE_SUPER_14:
+        case CODE_SUPER_15:
+        case CODE_SUPER_16:
+        {
+            int numArgs = bytecode[i - 1] - CODE_SUPER_0;
+            int symbol = READ_SHORT();
+            int superclass = READ_SHORT();
+            printf("SUPER_%-10d %5d '%s' %5d\n", numArgs, symbol,
+                    vm.methodNames.data[symbol].value.ptr, superclass);
+            break;
+        }
+
+        case CODE_JUMP:
+        {
+            int offset = READ_SHORT();
+            printf("%-16s %5d to %d\n", "JUMP".ptr, offset, i + offset);
+            break;
+        }
+
+        case CODE_LOOP:
+        {
+            int offset = READ_SHORT();
+            printf("%-16s %5d to %d\n", "LOOP".ptr, offset, i - offset);
+            break;
+        }
+
+        case CODE_JUMP_IF:
+        {
+            int offset = READ_SHORT();
+            printf("%-16s %5d to %d\n", "JUMP_IF".ptr, offset, i + offset);
+            break;
+        }
+
+        case CODE_AND:
+        {
+            int offset = READ_SHORT();
+            printf("%-16s %5d to %d\n", "AND".ptr, offset, i + offset);
+            break;
+        }
+
+        case CODE_OR:
+        {
+            int offset = READ_SHORT();
+            printf("%-16s %5d to %d\n", "OR".ptr, offset, i + offset);
+            break;
+        }
+
+        case CODE_CLOSE_UPVALUE: printf("CLOSE_UPVALUE\n"); break;
+        case CODE_RETURN:        printf("RETURN\n"); break;
+
+        case CODE_CLOSURE:
+        {
+            int constant = READ_SHORT();
+            printf("%-16s %5d ", "CLOSURE".ptr, constant);
+            wrenDumpValue(fn.constants.data[constant]);
+            printf(" ");
+            ObjFn* loadedFn = AS_FN(fn.constants.data[constant]);
+            for (int j = 0; j < loadedFn.numUpvalues; j++)
+            {
+                int isLocal = READ_BYTE();
+                int index = READ_BYTE();
+                if (j > 0) printf(", ");
+                printf("%s %d", isLocal ? "local".ptr : "upvalue".ptr, index);
+            }
+            printf("\n");
+            break;
+        }
+
+        case CODE_CONSTRUCT:         printf("CONSTRUCT\n"); break;
+        case CODE_FOREIGN_CONSTRUCT: printf("FOREIGN_CONSTRUCT\n"); break;
+        
+        case CODE_CLASS:
+        {
+            int numFields = READ_BYTE();
+            printf("%-16s %5d fields\n", "CLASS".ptr, numFields);
+            break;
+        }
+
+        case CODE_FOREIGN_CLASS: printf("FOREIGN_CLASS\n"); break;
+        case CODE_END_CLASS: printf("END_CLASS\n"); break;
+
+        case CODE_METHOD_INSTANCE:
+        {
+            int symbol = READ_SHORT();
+            printf("%-16s %5d '%s'\n", "METHOD_INSTANCE".ptr, symbol,
+                    vm.methodNames.data[symbol].value.ptr);
+            break;
+        }
+
+        case CODE_METHOD_STATIC:
+        {
+            int symbol = READ_SHORT();
+            printf("%-16s %5d '%s'\n", "METHOD_STATIC".ptr, symbol,
+                    vm.methodNames.data[symbol].value.ptr);
+            break;
+        }
+        
+        case CODE_END_MODULE:
+            printf("END_MODULE\n");
+            break;
+        
+        case CODE_IMPORT_MODULE:
+        {
+            int name = READ_SHORT();
+            printf("%-16s %5d '", "IMPORT_MODULE".ptr, name);
+            wrenDumpValue(fn.constants.data[name]);
+            printf("'\n");
+            break;
+        }
+        
+        case CODE_IMPORT_VARIABLE:
+        {
+            int variable = READ_SHORT();
+            printf("%-16s %5d '", "IMPORT_VARIABLE".ptr, variable);
+            wrenDumpValue(fn.constants.data[variable]);
+            printf("'\n");
+            break;
+        }
+        
+        case CODE_END:
+            printf("END\n");
+            break;
+
+        default:
+            printf("UKNOWN! [%d]\n", bytecode[i - 1]);
+            break;
+    }
+
+    // Return how many bytes this instruction takes, or -1 if it's an END.
+    if (code == Code.CODE_END) return -1;
+    return i - start;
 }
 
 int wrenDumpInstruction(WrenVM* vm, ObjFn* fn, int i)
