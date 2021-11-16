@@ -116,23 +116,36 @@ uint calculateRange(WrenVM* vm, ObjRange* range, uint* length,
     return from;
 }
 
+import wren.value : MethodType;
+
 struct WrenPrimitive
 {
+    import wren.value : MethodType;
     string className;
     string primitiveName;
+    MethodType methodType = MethodType.METHOD_PRIMITIVE;
+    bool registerToSuperClass = false;
 }
 
-template PRIMITIVE(alias name, alias func)
+template PRIMITIVE(alias name,
+                   alias func,
+                   MethodType methodType = MethodType.METHOD_PRIMITIVE,
+                   bool registerToSuperClass = false)
 {
-    import wren.value : ObjClass, wrenSymbolTableEnsure, wrenBindMethod, Method, MethodType;
+    import wren.value : ObjClass, wrenSymbolTableEnsure, wrenBindMethod, Method;
     void PRIMITIVE(WrenVM* vm, ObjClass* cls) {
         import core.stdc.string : strlen;
         int symbol = wrenSymbolTableEnsure(vm,
             &vm.methodNames, name, strlen(name));
         Method method;
-        method.type = MethodType.METHOD_PRIMITIVE;
+        method.type = methodType;
         method.as.primitive = &func;
-        wrenBindMethod(vm, cls, symbol, method);
+
+        static if (registerToSuperClass) {
+            wrenBindMethod(vm, cls.obj.classObj, symbol, method);
+        } else {
+            wrenBindMethod(vm, cls, symbol, method);
+        }
     }
 }
 

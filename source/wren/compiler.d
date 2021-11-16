@@ -6,6 +6,9 @@ import wren.utils;
 import wren.value;
 import wren.vm;
 
+// So we can throw errors without statically allocating them
+import dplug.core : mallocNew;
+
 @nogc:
 // This is written in bottom-up order, so the tokenization comes first, then
 // parsing/code generation. This minimizes the number of explicit forward
@@ -410,7 +413,10 @@ static void printError(Parser* parser, int line, const(char)* label,
     char[ERROR_MESSAGE_SIZE] message;
     int length = sprintf(message.ptr, "%s: ", label);
     length += vsprintf(message.ptr + length, format, args);
-    assert(length < ERROR_MESSAGE_SIZE, "Error should not exceed buffer.");
+
+    if (length > ERROR_MESSAGE_SIZE)
+        throw mallocNew!Error("Error should not exceed buffer.");
+    // assert(length < ERROR_MESSAGE_SIZE, "Error should not exceed buffer.");
 
     ObjString* module_ = parser.module_.name;
     const(char)* module_name = module_ ? module_.value.ptr : "<unknown>";
@@ -1476,7 +1482,9 @@ static void pushScope(Compiler* compiler)
 // Returns the number of local variables that were eliminated.
 static int discardLocals(Compiler* compiler, int depth)
 {
-    assert(compiler.scopeDepth > -1, "Cannot exit top-level scope.");
+    if (compiler.scopeDepth < -1)
+        throw mallocNew!Error("Cannot exit top-level scope.");
+    // assert(compiler.scopeDepth > -1, "Cannot exit top-level scope.");
 
     int local = compiler.numLocals - 1;
     while (local >= 0 && compiler.locals[local].depth >= depth)
@@ -1897,7 +1905,7 @@ static void signatureToString(Signature* signature,
             break;
 
         default:
-            assert(0, "Unexpected signature type");
+            throw mallocNew!Error("Unexpected signature type hit");
     }
 
     name[*length] = '\0';
@@ -2098,7 +2106,7 @@ static void loadVariable(Compiler* compiler, Variable variable)
             emitShortArg(compiler, Code.CODE_LOAD_MODULE_VAR, variable.index);
             break;
         default:
-            assert(0, "Unreachable");
+            throw mallocNew!Error("Unreachable code hit");
     }
 }
 
@@ -2115,7 +2123,9 @@ static void loadCoreVariable(Compiler* compiler, const(char)* name)
     import core.stdc.string : strlen;
     int symbol = wrenSymbolTableFind(&compiler.parser.module_.variableNames,
                                     name, strlen(name));
-    assert(symbol != -1, "Should have already defined core name.");
+    // assert(symbol != -1, "Should have already defined core name.");
+    if (symbol == -1)
+        throw mallocNew!Error("Should have already defined core name.");
     emitShortArg(compiler, Code.CODE_LOAD_MODULE_VAR, symbol);
 }
 
@@ -2303,7 +2313,8 @@ static void bareName(Compiler* compiler, bool canAssign, Variable variable)
             emitShortArg(compiler, Code.CODE_STORE_MODULE_VAR, variable.index);
             break;
         default:
-            assert(0, "Unreachable");
+            throw mallocNew!Error("Unreachable code hit.");
+            // assert(0, "Unreachable");
         }
         return;
     }
@@ -2938,10 +2949,9 @@ static int getByteCountForArguments(const ubyte* bytecode,
             return 2 + (loadedFn.numUpvalues * 2);
         }
         default:
-            assert(0, "Unreachable");
+            throw mallocNew!Error("Unreachable code hit");
+            // assert(0, "Unreachable");
     }
-
-    assert(0, "Unreachable");
 }
 
 // Marks the beginning of a loop. Keeps track of the current instruction so we
