@@ -97,7 +97,7 @@ void wrenDumpValue(Value value)
     }
     else
     {
-        switch (value.type)
+        switch (value.type) with(ValueType)
         {
             case VAL_FALSE:     printf("false"); break;
             case VAL_NULL:      printf("null"); break;

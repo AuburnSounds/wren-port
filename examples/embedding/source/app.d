@@ -60,5 +60,6 @@ void main()
 		default:
 			assert(0);
 	}
-	// TODO: when more functions are implemented, we can work on it from there
+
+	wrenFreeVM(vm);
 }

@@ -777,7 +777,7 @@ else
     // Value . 0 or 1.
     bool AS_BOOL(Value value)
     {
-        return ((value).type = VAL_TRUE);
+        return ((value).type == ValueType.VAL_TRUE);
     }
 
     // Value . Obj*.
@@ -789,34 +789,34 @@ else
     // Determines if [value] is a garbage-collected object or not.
     bool IS_OBJ(Value value)
     {
-        return ((value).type == VAL_OBJ);
+        return ((value).type == ValueType.VAL_OBJ);
     }
 
     bool IS_FALSE(Value value)
     {
-        return ((value).type == VAL_FALSE);
+        return ((value).type == ValueType.VAL_FALSE);
     }
 
     bool IS_NULL(Value value)
     {
-        return ((value).type == VAL_NULL);
+        return ((value).type == ValueType.VAL_NULL);
     }
 
     bool IS_NUM(Value value)
     {
-        return ((value).type == VAL_NUM);
+        return ((value).type == ValueType.VAL_NUM);
     }
 
     bool IS_UNDEFINED(Value value)
     {
-        return ((value).type == VAL_UNDEFINED);
+        return ((value).type == ValueType.VAL_UNDEFINED);
     }
 
     // Singleton values.
-    enum FALSE_VAL = Value(ValueType.VAL_FALSE, null);
-    enum NULL_VAL = Value(ValueType.VAL_NULL, null);
-    enum TRUE_VAL = Value(ValueType.VAL_TRUE, null);
-    enum UNDEFINED_VAL = Value(ValueType.VAL_UNDEFINED, null);
+    enum FALSE_VAL = Value(ValueType.VAL_FALSE);
+    enum NULL_VAL = Value(ValueType.VAL_NULL);
+    enum TRUE_VAL = Value(ValueType.VAL_TRUE);
+    enum UNDEFINED_VAL = Value(ValueType.VAL_UNDEFINED);
 }
 
 // Returns true if [a] and [b] are strictly the same value. This is identity
@@ -830,7 +830,7 @@ static bool wrenValuesSame(Value a, Value b)
     else
     {
         if (a.type != b.type) return false;
-        if (a.type == VAL_NUM) return a.as.num == b.as.num;
+        if (a.type == ValueType.VAL_NUM) return a.as.num == b.as.num;
         return a.as.obj == b.as.obj;
     }
 }
@@ -1375,7 +1375,7 @@ static uint hashValue(Value value)
     }
     else
     {
-        switch (value.type)
+        switch (value.type) with(ValueType)
         {
             case VAL_FALSE: return 0;
             case VAL_NULL:  return 1;
@@ -1384,8 +1384,6 @@ static uint hashValue(Value value)
             case VAL_OBJ:   return hashObject(AS_OBJ(value));
             default:        assert(0, "Unreachable?");
         }
-  
-        return 0;
     }
 }
 
@@ -2060,34 +2058,35 @@ static void blackenClosure(WrenVM* vm, ObjClosure* closure)
 
 static void blackenFiber(WrenVM* vm, ObjFiber* fiber)
 {
-  // Stack functions.
-  for (int i = 0; i < fiber.numFrames; i++)
-  {
-    wrenGrayObj(vm, cast(Obj*)fiber.frames[i].closure);
-  }
+    // Stack functions.
 
-  // Stack variables.
-  for (Value* slot = fiber.stack; slot < fiber.stackTop; slot++)
-  {
-    wrenGrayValue(vm, *slot);
-  }
+    for (int i = 0; i < fiber.numFrames; i++)
+    {
+        wrenGrayObj(vm, cast(Obj*)fiber.frames[i].closure);
+    }
 
-  // Open upvalues.
-  ObjUpvalue* upvalue = fiber.openUpvalues;
-  while (upvalue != null)
-  {
-    wrenGrayObj(vm, cast(Obj*)upvalue);
-    upvalue = upvalue.next;
-  }
+    // Stack variables.
+    for (Value* slot = fiber.stack; slot < fiber.stackTop; slot++)
+    {
+        wrenGrayValue(vm, *slot);
+    }
 
-  // The caller.
-  wrenGrayObj(vm, cast(Obj*)fiber.caller);
-  wrenGrayValue(vm, fiber.error);
+    // Open upvalues.
+    ObjUpvalue* upvalue = fiber.openUpvalues;
+    while (upvalue != null)
+    {
+        wrenGrayObj(vm, cast(Obj*)upvalue);
+        upvalue = upvalue.next;
+    }
 
-  // Keep track of how much memory is still in use.
-  vm.bytesAllocated += ObjFiber.sizeof;
-  vm.bytesAllocated += fiber.frameCapacity * CallFrame.sizeof;
-  vm.bytesAllocated += fiber.stackCapacity * Value.sizeof;
+    // The caller.
+    wrenGrayObj(vm, cast(Obj*)fiber.caller);
+    wrenGrayValue(vm, fiber.error);
+
+    // Keep track of how much memory is still in use.
+    vm.bytesAllocated += ObjFiber.sizeof;
+    vm.bytesAllocated += fiber.frameCapacity * CallFrame.sizeof;
+    vm.bytesAllocated += fiber.stackCapacity * Value.sizeof;
 }
 
 static void blackenFn(WrenVM* vm, ObjFn* fn)

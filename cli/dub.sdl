@@ -1,0 +1,8 @@
+name "wren-cli"
+description "A simple REPL / CLI for the Wren language"
+authors "Harrison Ford"
+copyright "Copyright © 2021, Harrison Ford"
+license "proprietary"
+targetType "executable"
+dependency "wren-d" path="../"
+# versions "WrenNoNanTagging"

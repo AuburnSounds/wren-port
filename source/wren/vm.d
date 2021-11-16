@@ -676,15 +676,17 @@ static WrenForeignMethodFn findForeignMethod(WrenVM* vm,
     if (method == null)
     {
         import core.stdc.string : strcmp;
-        static if (false) {
+        static if (WREN_OPT_META) {
             if (strcmp(moduleName, "meta") == 0)
             {
+                import wren.optional.meta : wrenMetaBindForeignMethod;
                 method = wrenMetaBindForeignMethod(vm, className, isStatic, signature);
             }
         }
-        static if (false) {
+        static if (WREN_OPT_RANDOM) {
             if (strcmp(moduleName, "random") == 0)
             {
+                import wren.optional.random : wrenRandomBindForeignMethod;
                 method = wrenRandomBindForeignMethod(vm, className, isStatic, signature);
             }
         }
@@ -933,14 +935,15 @@ static void bindForeignClass(WrenVM* vm, ObjClass* classObj, ObjModule* module_)
     }
 
     // If the host didn't provide it, see if it's a built in optional module.
-    if (cast(Value)methods.allocate == NULL_VAL && methods.finalize == null)
+    if (methods.allocate == null && methods.finalize == null)
     {
-    // #if WREN_OPT_RANDOM
-        static if (false) {
-            if (strcmp(module_.name.value, "random") == 0)
+        static if (WREN_OPT_RANDOM) {
+            import core.stdc.string : strcmp;
+            if (strcmp(module_.name.value.ptr, "random") == 0)
             {
-                methods = wrenRandomBindForeignClass(vm, module_.name.value,
-                                                classObj.name.value);
+                import wren.optional.random : wrenRandomBindForeignClass;
+                methods = wrenRandomBindForeignClass(vm, module_.name.value.ptr,
+                                                classObj.name.value.ptr);
             }
         }
     }
@@ -1113,11 +1116,13 @@ static Value importModule(WrenVM* vm, Value name)
         import core.stdc.string : strcmp;
         result.onComplete = null;
         ObjString* nameString = AS_STRING(name);
-        static if (false) {
-            if (strcmp(nameString.value, "meta") == 0) result.source = wrenMetaSource();
+        static if (WREN_OPT_META) {
+            import wren.optional.meta : wrenMetaSource;
+            if (strcmp(nameString.value.ptr, "meta") == 0) result.source = wrenMetaSource().ptr;
         }
-        static if (false) {
-            if (strcmp(nameString.value, "random") == 0) result.source = wrenRandomSource();
+        static if (WREN_OPT_RANDOM) {
+            import wren.optional.random : wrenRandomSource;
+            if (strcmp(nameString.value.ptr, "random") == 0) result.source = wrenRandomSource().ptr;
         }
     }
     
@@ -1207,30 +1212,37 @@ static WrenInterpretResult runInterpreter(WrenVM* vm, ObjFiber* fiber)
     Method* method;
 
     // These macros are designed to only be invoked within this function.
+    pragma(inline, true)
     void PUSH(Value value) {
         *fiber.stackTop++ = value;
     }
 
+    pragma(inline, true)
     Value POP() {
         return (*(--fiber.stackTop));
     }
 
+    pragma(inline, true)
     void DROP() {
         fiber.stackTop--;
     }
 
+    pragma(inline, true)
     Value PEEK() {
         return (*(fiber.stackTop - 1));
     }
 
+    pragma(inline, true)
     Value PEEK2() {
         return (*(fiber.stackTop - 2));
     }
 
+    pragma(inline, true)
     ubyte READ_BYTE() {
         return (*ip++);
     }
 
+    pragma(inline, true)
     ushort READ_SHORT() {
         ip += 2;
         return cast(ushort)((ip[-2] << 8) | ip[-1]);
@@ -1238,12 +1250,14 @@ static WrenInterpretResult runInterpreter(WrenVM* vm, ObjFiber* fiber)
 
     // Use this before a CallFrame is pushed to store the local variables back
     // into the current one.
+    pragma(inline, true)
     void STORE_FRAME() {
         frame.ip = ip;
     }
 
     // Use this after a CallFrame has been pushed or popped to refresh the local
     // variables.
+    pragma(inline, true)
     void LOAD_FRAME() {
         frame = &fiber.frames[fiber.numFrames - 1];
         stackStart = frame.stackStart;
@@ -1265,9 +1279,23 @@ static WrenInterpretResult runInterpreter(WrenVM* vm, ObjFiber* fiber)
         };
     }
 
+    static if (WREN_DEBUG_TRACE_INSTRUCTIONS)
+    {
+        void DEBUG_TRACE_INSTRUCTION() {
+            import wren.dbg : wrenDumpStack, wrenDumpInstruction;
+            wrenDumpStack(fiber);
+            wrenDumpInstruction(vm, fn, cast(int)(ip - fn.code.data));
+        }
+    }
+
     LOAD_FRAME();
     Code instruction;
+
 loop:
+    static if (WREN_DEBUG_TRACE_INSTRUCTIONS)
+    {
+        DEBUG_TRACE_INSTRUCTION();
+    }
     switch (instruction = cast(Code)READ_BYTE()) with(Code)
     {
         case CODE_LOAD_LOCAL_0:
@@ -1408,7 +1436,7 @@ loop:
                             // If we don't have a fiber to switch to, stop interpreting.
                             fiber = vm.fiber;
                             if (fiber == null) return WrenInterpretResult.WREN_RESULT_SUCCESS;
-                            if (wrenHasError(fiber)) RUNTIME_ERROR();
+                            if (wrenHasError(fiber)) mixin(RUNTIME_ERROR);
                             LOAD_FRAME();
                         }
                         break;
@@ -1559,6 +1587,14 @@ loop:
                 // Short-circuit the right hand side.
                 ip += offset;
             }
+            goto loop;
+        }
+
+        case CODE_CLOSE_UPVALUE:
+        {
+            // Close the upvalue for the local if we have one.
+            closeUpvalues(fiber, fiber.stackTop - 1);
+            DROP();
             goto loop;
         }
 
@@ -2031,7 +2067,7 @@ static ObjClass* wrenGetClassInline(WrenVM* vm, Value value)
             default: assert(0, "Unhandled tag?");
         }
     } else { 
-        switch (value.type)
+        switch (value.type) with(ValueType)
         {
             case VAL_FALSE:     return vm.boolClass;
             case VAL_NULL:      return vm.nullClass;
@@ -2039,9 +2075,9 @@ static ObjClass* wrenGetClassInline(WrenVM* vm, Value value)
             case VAL_TRUE:      return vm.boolClass;
             case VAL_OBJ:       return AS_OBJ(value).classObj;
             case VAL_UNDEFINED: assert(0, "Unreachable");
+            default: assert(0, "Unreachable");
         }
     }
-    assert(0, "Unreachable");
 }
 
 int wrenGetSlotCount(WrenVM* vm)

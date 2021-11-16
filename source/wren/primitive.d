@@ -12,6 +12,14 @@ uint validateIndexValue(WrenVM* vm, uint count, double value,
 {
     if (!validateIntValue(vm, value, argName)) return uint.max;
 
+    // Negative indices count from the end.
+    if (value < 0) value = count + value;
+  
+    // Check bounds.
+    if (value >= 0 && value < count) return cast(uint)value;
+  
+    vm.fiber.error = wrenStringFormat(vm, "$ out of bounds.", argName);
+
     return uint.max;
 }
 

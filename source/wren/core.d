@@ -6,8 +6,9 @@ import wren.vm;
 
 // Throwing exception support
 import dplug.core : mallocNew;
-// The core module source
-static const(char)[] coreModuleSource = import("wren_core.wren");
+
+// The core module source that is interpreted whenever core is initialized.
+private static const(char)[] coreModuleSource = import("wren_core.wren");
 
 /++ Boolean primitives +/
 @WrenPrimitive("Bool", "!") 
@@ -893,7 +894,7 @@ bool range_isInclusive(WrenVM* vm, Value* args) @nogc
     return RETURN_BOOL(args, AS_RANGE(args[0]).isInclusive);
 }
 
-@WrenPrimitive("Range", "iterate")
+@WrenPrimitive("Range", "iterate(_)")
 bool range_iterate(WrenVM* vm, Value* args) @nogc
 {
     ObjRange* range = AS_RANGE(args[0]);
@@ -925,7 +926,7 @@ bool range_iterate(WrenVM* vm, Value* args) @nogc
     return RETURN_NUM(args, iterator);
 }
 
-@WrenPrimitive("Range", "iteratorValue")
+@WrenPrimitive("Range", "iteratorValue(_)")
 bool range_iteratorValue(WrenVM* vm, Value* args) @nogc
 {
     // Assume the iterator is a number so that is the value of the range.

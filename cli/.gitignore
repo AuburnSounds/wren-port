@@ -1,0 +1,15 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/wren-cli
+wren-cli.so
+wren-cli.dylib
+wren-cli.dll
+wren-cli.a
+wren-cli.lib
+wren-cli-test-*
+*.exe
+*.o
+*.obj
+*.lst
