@@ -1,4 +1,5 @@
 module wren.core;
+import wren.math;
 import wren.primitive;
 import wren.value;
 import wren.vm;
@@ -527,10 +528,266 @@ bool null_toString(WrenVM* vm, Value* args) @nogc
 
 /++ Num primitives +/
 
+// Porting over macros is always a joy.
+private string DEF_NUM_CONSTANT(string name, string val)
+{
+    import std.format : format;
+
+    return format!q{
+        @WrenPrimitive("Num", "%1$s", MethodType.METHOD_PRIMITIVE, true)
+        bool num_%1$s(WrenVM* vm, Value* args) @nogc
+        {
+            return RETURN_NUM(args, %2$s);
+        }
+    }(name, val);
+}
+
+mixin(DEF_NUM_CONSTANT("infinity", "double.infinity"));
+mixin(DEF_NUM_CONSTANT("nan", "WREN_DOUBLE_NAN"));
+mixin(DEF_NUM_CONSTANT("pi", "3.14159265358979323846264338327950288"));
+mixin(DEF_NUM_CONSTANT("tau", "6.28318530717958647692528676655900577"));
+
+mixin(DEF_NUM_CONSTANT("largest", "double.max"));
+mixin(DEF_NUM_CONSTANT("smallest", "double.min_normal"));
+
+mixin(DEF_NUM_CONSTANT("maxSafeInteger", "9007199254740991.0"));
+mixin(DEF_NUM_CONSTANT("minSafeInteger", "-9007199254740991.0"));
+
+private string DEF_NUM_INFIX(string name, string op, string type)
+{
+    import std.format : format;
+
+    return format!q{
+        @WrenPrimitive("Num", "%2$s(_)")
+        bool num_%1$s(WrenVM* vm, Value* args) @nogc
+        {
+            if (!validateNum(vm, args[1], "Right operand")) return false;
+            return RETURN_%3$s(args, AS_NUM(args[0]) %2$s AS_NUM(args[1]));
+        }
+    }(name, op, type);
+}
+
+mixin(DEF_NUM_INFIX("minus",    "-",  "NUM"));
+mixin(DEF_NUM_INFIX("plus",     "+",  "NUM"));
+mixin(DEF_NUM_INFIX("multiply", "*",  "NUM"));
+mixin(DEF_NUM_INFIX("divide",   "/",  "NUM"));
+mixin(DEF_NUM_INFIX("lt",       "<",  "BOOL"));
+mixin(DEF_NUM_INFIX("gt",       ">",  "BOOL"));
+mixin(DEF_NUM_INFIX("lte",      "<=", "BOOL"));
+mixin(DEF_NUM_INFIX("gte",      ">=", "BOOL"));
+
+private string DEF_NUM_BITWISE(string name, string op)
+{
+    import std.format : format;
+
+    return format!q{
+        @WrenPrimitive("Num", "%2$s(_)")
+        bool num_bitwise%1$s(WrenVM* vm, Value* args) @nogc
+        {
+            if (!validateNum(vm, args[1], "Right operand")) return false;
+            uint left = cast(uint)AS_NUM(args[0]);
+            uint right = cast(uint)AS_NUM(args[1]);
+            return RETURN_NUM(args, left %2$s right);
+        }
+    }(name, op);
+}
+
+mixin(DEF_NUM_BITWISE("And",        "&"));
+mixin(DEF_NUM_BITWISE("Or",         "|"));
+mixin(DEF_NUM_BITWISE("Xor",        "^"));
+mixin(DEF_NUM_BITWISE("LeftShift",  "<<"));
+mixin(DEF_NUM_BITWISE("RightShift", ">>"));
+
+private string DEF_NUM_FN(string name, string fn)
+{
+    import std.format : format;
+
+    return format!q{
+        @WrenPrimitive("Num", "%1$s")
+        bool num_%1$s(WrenVM* vm, Value* args) @nogc
+        {
+            import core.stdc.math : %2$s;
+            return RETURN_NUM(args, %2$s(AS_NUM(args[0])));
+        }
+    }(name, fn);
+}
+
+mixin(DEF_NUM_FN("abs", "fabs"));
+mixin(DEF_NUM_FN("acos", "acos"));
+mixin(DEF_NUM_FN("asin", "asin"));
+mixin(DEF_NUM_FN("atan", "atan"));
+mixin(DEF_NUM_FN("cbrt", "cbrt"));
+mixin(DEF_NUM_FN("ceil", "ceil"));
+mixin(DEF_NUM_FN("cos", "cos"));
+mixin(DEF_NUM_FN("floor", "floor"));
+mixin(DEF_NUM_FN("round", "round"));
+mixin(DEF_NUM_FN("sin", "sin"));
+mixin(DEF_NUM_FN("sqrt", "sqrt"));
+mixin(DEF_NUM_FN("tan", "tan"));
+mixin(DEF_NUM_FN("log", "log"));
+mixin(DEF_NUM_FN("log2", "log2"));
+mixin(DEF_NUM_FN("exp", "exp"));
+
+@WrenPrimitive("Num", "-")
+bool num_negate(WrenVM* vm, Value* args) @nogc
+{
+    return RETURN_NUM(args, -AS_NUM(args[0]));
+}
+
+@WrenPrimitive("Num", "%(_)")
+bool num_mod(WrenVM* vm, Value* args) @nogc
+{
+    import core.stdc.math : fmod;
+    if (!validateNum(vm, args[1], "Right operand")) return false;
+    return RETURN_NUM(args, fmod(AS_NUM(args[0]), AS_NUM(args[1])));
+}
+
+@WrenPrimitive("Num", "==(_)")
+bool num_eqeq(WrenVM* vm, Value* args) @nogc
+{
+    if (!IS_NUM(args[1])) return RETURN_FALSE(args);
+    return RETURN_BOOL(args, AS_NUM(args[0]) == AS_NUM(args[1]));
+}
+
+@WrenPrimitive("Num", "!=(_)")
+bool num_bangeq(WrenVM* vm, Value* args) @nogc
+{
+    if (!IS_NUM(args[1])) return RETURN_TRUE(args);
+    return RETURN_BOOL(args, AS_NUM(args[0]) != AS_NUM(args[1]));
+}
+
+@WrenPrimitive("Num", "~")
+bool num_bitwiseNot(WrenVM* vm, Value* args) @nogc
+{
+    // Bitwise operators always work on 32-bit unsigned ints.
+    return RETURN_NUM(args, ~cast(uint)(AS_NUM(args[0])));
+}
+
+@WrenPrimitive("Num", "..(_)")
+bool num_dotDot(WrenVM* vm, Value* args) @nogc
+{
+    if (!validateNum(vm, args[1], "Right hand side of range")) return false;
+
+    double from = AS_NUM(args[0]);
+    double to = AS_NUM(args[1]);
+    return RETURN_VAL(args, wrenNewRange(vm, from, to, true));
+}
+
+@WrenPrimitive("Num", "...(_)")
+bool num_dotDotDot(WrenVM* vm, Value* args) @nogc
+{
+    if (!validateNum(vm, args[1], "Right hand side of range")) return false;
+
+    double from = AS_NUM(args[0]);
+    double to = AS_NUM(args[1]);
+    return RETURN_VAL(args, wrenNewRange(vm, from, to, false));
+}
+
+@WrenPrimitive("Num", "atan2(_)")
+bool num_atan2(WrenVM* vm, Value* args) @nogc
+{
+    import core.stdc.math : atan2;
+    if (!validateNum(vm, args[1], "x value")) return false;
+
+    return RETURN_NUM(args, atan2(AS_NUM(args[0]), AS_NUM(args[1])));
+}
+
+@WrenPrimitive("Num", "min(_)")
+bool num_min(WrenVM* vm, Value* args) @nogc
+{
+    if (!validateNum(vm, args[1], "Other value")) return false;
+
+    double value = AS_NUM(args[0]);
+    double other = AS_NUM(args[1]);
+    return RETURN_NUM(args, value <= other ? value : other);
+}
+
+@WrenPrimitive("Num", "max(_)")
+bool num_max(WrenVM* vm, Value* args) @nogc
+{
+    if (!validateNum(vm, args[1], "Other value")) return false;
+
+    double value = AS_NUM(args[0]);
+    double other = AS_NUM(args[1]);
+    return RETURN_NUM(args, value > other ? value : other);
+}
+
+@WrenPrimitive("Num", "clamp(_,_)")
+bool num_clamp(WrenVM* vm, Value* args) @nogc
+{
+    if (!validateNum(vm, args[1], "Min value")) return false;
+    if (!validateNum(vm, args[2], "Max value")) return false;
+
+    double value = AS_NUM(args[0]);
+    double min = AS_NUM(args[1]);
+    double max = AS_NUM(args[2]);
+    double result = (value < min) ? min : ((value > max) ? max : value);
+    return RETURN_NUM(args, result);
+}
+
+@WrenPrimitive("Num", "pow(_)")
+bool num_pow(WrenVM* vm, Value* args) @nogc
+{
+    import core.stdc.math : pow;
+    if (!validateNum(vm, args[1], "Power value")) return false;
+
+    return RETURN_NUM(args, pow(AS_NUM(args[0]), AS_NUM(args[1])));
+}
+
+@WrenPrimitive("Num", "fraction")
+bool num_fraction(WrenVM* vm, Value* args) @nogc
+{
+    import core.stdc.math : modf;
+
+    double unused;
+    return RETURN_NUM(args, modf(AS_NUM(args[0]), &unused));
+}
+
+@WrenPrimitive("Num", "isInfinity")
+bool num_isInfinity(WrenVM* vm, Value* args) @nogc
+{
+    import core.stdc.math : isinf;
+    return RETURN_BOOL(args, isinf(AS_NUM(args[0])) == 1);
+}
+
+@WrenPrimitive("Num", "isNan")
+bool num_isNan(WrenVM* vm, Value* args) @nogc
+{
+    import core.stdc.math : isnan;
+    return RETURN_BOOL(args, isnan(AS_NUM(args[0])) == 1);
+}
+
+@WrenPrimitive("Num", "sign")
+bool num_sign(WrenVM* vm, Value* args) @nogc
+{
+    double value = AS_NUM(args[0]);
+    if (value > 0) 
+    {
+        return RETURN_NUM(args, 1);
+    }
+    else if (value < 0)
+    {
+        return RETURN_NUM(args, -1);
+    }
+    else
+    {
+        return RETURN_NUM(args, 0);
+    }
+}
+
 @WrenPrimitive("Num", "toString")
 bool num_toString(WrenVM* vm, Value* args) @nogc
 {
     return RETURN_VAL(args, wrenNumToString(vm, AS_NUM(args[0])));   
+}
+
+@WrenPrimitive("Num", "truncate")
+bool num_truncate(WrenVM* vm, Value* args) @nogc
+{
+    import core.stdc.math : modf;
+    double integer;
+    modf(AS_NUM(args[0]), &integer);
+    return RETURN_NUM(args, integer);
 }
 
 /++ Object primitives +/
@@ -598,6 +855,318 @@ bool object_toString(WrenVM* vm, Value* args) @nogc
 bool object_type(WrenVM* vm, Value* args) @nogc
 {
     return RETURN_OBJ(args, wrenGetClass(vm, args[0]));
+}
+
+/++ Range primitives +/
+
+@WrenPrimitive("Range", "from")
+bool range_from(WrenVM* vm, Value* args) @nogc
+{
+    return RETURN_NUM(args, AS_RANGE(args[0]).from);
+}
+
+@WrenPrimitive("Range", "to")
+bool range_to(WrenVM* vm, Value* args) @nogc
+{
+    return RETURN_NUM(args, AS_RANGE(args[0]).to);
+}
+
+@WrenPrimitive("Range", "min")
+bool range_min(WrenVM* vm, Value* args) @nogc
+{
+    import core.stdc.math : fmin;
+    ObjRange* range = AS_RANGE(args[0]);
+    return RETURN_NUM(args, fmin(range.from, range.to));
+}
+
+@WrenPrimitive("Range", "max")
+bool range_max(WrenVM* vm, Value* args) @nogc
+{
+    import core.stdc.math : fmax;
+    ObjRange* range = AS_RANGE(args[0]);
+    return RETURN_NUM(args, fmax(range.from, range.to));
+}
+
+@WrenPrimitive("Range", "isInclusive")
+bool range_isInclusive(WrenVM* vm, Value* args) @nogc
+{
+    return RETURN_BOOL(args, AS_RANGE(args[0]).isInclusive);
+}
+
+@WrenPrimitive("Range", "iterate")
+bool range_iterate(WrenVM* vm, Value* args) @nogc
+{
+    ObjRange* range = AS_RANGE(args[0]);
+
+    // Special case: empty range.
+    if (range.from == range.to && !range.isInclusive) return RETURN_FALSE(args);
+
+    // Start the iteration.
+    if (IS_NULL(args[1])) return RETURN_NUM(args, range.from);
+
+    if (!validateNum(vm, args[1], "Iterator")) return false;
+
+    double iterator = AS_NUM(args[1]);
+
+    // Iterate towards [to] from [from].
+    if (range.from < range.to)
+    {
+        iterator++;
+        if (iterator > range.to) return RETURN_FALSE(args);
+    }
+    else
+    {
+        iterator--;
+        if (iterator < range.to) return RETURN_FALSE(args);
+    }
+
+    if (!range.isInclusive && iterator == range.to) return RETURN_FALSE(args);
+
+    return RETURN_NUM(args, iterator);
+}
+
+@WrenPrimitive("Range", "iteratorValue")
+bool range_iteratorValue(WrenVM* vm, Value* args) @nogc
+{
+    // Assume the iterator is a number so that is the value of the range.
+    return RETURN_VAL(args, args[1]);
+}
+
+@WrenPrimitive("Range", "toString")
+bool range_toString(WrenVM* vm, Value* args) @nogc
+{
+    ObjRange* range = AS_RANGE(args[0]);
+
+    Value from = wrenNumToString(vm, range.from);
+    wrenPushRoot(vm, AS_OBJ(from));
+
+    Value to = wrenNumToString(vm, range.to);
+    wrenPushRoot(vm, AS_OBJ(to));
+
+    Value result = wrenStringFormat(vm, "@$@", from,
+                                    range.isInclusive ? "..".ptr : "...".ptr, to);
+
+    wrenPopRoot(vm);
+    wrenPopRoot(vm);
+    return RETURN_VAL(args, result);
+}
+
+/++ String primitives +/
+
+@WrenPrimitive("String", "fromCodePoint(_)", MethodType.METHOD_PRIMITIVE, true)
+bool string_fromCodePoint(WrenVM* vm, Value* args) @nogc
+{
+    if (!validateInt(vm, args[1], "Code point")) return false;
+
+    int codePoint = cast(int)AS_NUM(args[1]);
+    if (codePoint < 0)
+    {
+        return RETURN_ERROR(vm, "Code point cannot be negative.");
+    }
+    else if (codePoint > 0x10ffff)
+    {
+        return RETURN_ERROR(vm, "Code point cannot be greater than 0x10ffff.");
+    }
+
+    return RETURN_VAL(args, wrenStringFromCodePoint(vm, codePoint));
+}
+
+@WrenPrimitive("String", "fromByte(_)", MethodType.METHOD_PRIMITIVE, true)
+bool string_fromByte(WrenVM* vm, Value* args) @nogc
+{
+    if (!validateInt(vm, args[1], "Byte")) return false;
+    int byte_ = cast(int) AS_NUM(args[1]);
+    if (byte_ < 0)
+    {
+        return RETURN_ERROR(vm, "Byte cannot be negative.");
+    }
+    else if (byte_ > 0xff)
+    {
+        return RETURN_ERROR(vm, "Byte cannot be greater than 0xff.");
+    }
+    return RETURN_VAL(args, wrenStringFromByte(vm, cast(ubyte)byte_));
+}
+
+@WrenPrimitive("String", "byteAt(_)")
+bool string_byteAt(WrenVM* vm, Value* args) @nogc
+{
+    ObjString* string_ = AS_STRING(args[0]);
+
+    uint index = validateIndex(vm, args[1], string_.length, "Index");
+    if (index == uint.max) return false;
+
+    return RETURN_NUM(args, cast(ubyte)string_.value[index]);
+}
+
+@WrenPrimitive("String", "byteCount")
+bool string_byteCount(WrenVM* vm, Value* args) @nogc
+{
+    return RETURN_NUM(args, AS_STRING(args[0]).length);
+}
+
+@WrenPrimitive("String", "codePointAt(_)")
+bool string_codePointAt(WrenVM* vm, Value* args) @nogc
+{
+    import wren.utils : wrenUtf8Decode;
+    ObjString* string_ = AS_STRING(args[0]);
+
+    uint index = validateIndex(vm, args[1], string_.length, "Index");
+    if (index == uint.max) return false;
+
+    // If we are in the middle of a UTF-8 sequence, indicate that.
+    const(ubyte)* bytes = cast(ubyte*)string_.value.ptr;
+    if ((bytes[index] & 0xc0) == 0x80) return RETURN_NUM(args, -1);
+
+    // Decode the UTF-8 sequence.
+    return RETURN_NUM(args, wrenUtf8Decode(cast(ubyte*)string_.value + index,
+                                string_.length - index));
+}
+
+@WrenPrimitive("String", "contains(_)")
+bool string_contains(WrenVM* vm, Value* args) @nogc
+{
+    if (!validateString(vm, args[1], "Argument")) return false;
+
+    ObjString* string_ = AS_STRING(args[0]);
+    ObjString* search = AS_STRING(args[1]);
+
+    return RETURN_BOOL(args, wrenStringFind(string_, search, 0) != uint.max);
+}
+
+@WrenPrimitive("String", "endsWith(_)")
+bool string_endsWith(WrenVM* vm, Value* args) @nogc
+{
+    import core.stdc.string : memcmp;
+    if (!validateString(vm, args[1], "Argument")) return false;
+
+    ObjString* string_ = AS_STRING(args[0]);
+    ObjString* search = AS_STRING(args[1]);
+
+    // Edge case: If the search string is longer then return false right away.
+    if (search.length > string_.length) return RETURN_FALSE(args);
+
+    return RETURN_BOOL(args, memcmp(string_.value.ptr + string_.length - search.length,
+                        search.value.ptr, search.length) == 0);
+}
+
+@WrenPrimitive("String", "indexOf(_)")
+bool string_indexOf1(WrenVM* vm, Value* args) @nogc
+{
+    if (!validateString(vm, args[1], "Argument")) return false;
+
+    ObjString* string_ = AS_STRING(args[0]);
+    ObjString* search = AS_STRING(args[1]);
+
+    uint index = wrenStringFind(string_, search, 0);
+    return RETURN_NUM(args, index == uint.max ? -1 : cast(int)index);
+}
+
+@WrenPrimitive("String", "indexOf(_,_)")
+bool string_indexOf2(WrenVM* vm, Value* args) @nogc
+{
+    if (!validateString(vm, args[1], "Argument")) return false;
+
+    ObjString* string_ = AS_STRING(args[0]);
+    ObjString* search = AS_STRING(args[1]);
+    uint start = validateIndex(vm, args[2], string_.length, "Start");
+    if (start == uint.max) return false;
+    
+    uint index = wrenStringFind(string_, search, start);
+    return RETURN_NUM(args, index == uint.max ? -1 : cast(int)index);   
+}
+
+@WrenPrimitive("String", "iterate(_)")
+bool string_iterate(WrenVM* vm, Value* args) @nogc
+{
+    ObjString* string_ = AS_STRING(args[0]);
+
+    // If we're starting the iteration, return the first index.
+    if (IS_NULL(args[1]))
+    {
+        if (string_.length == 0) return RETURN_FALSE(args);
+        return RETURN_NUM(args, 0);
+    }
+
+    if (!validateInt(vm, args[1], "Iterator")) return false;
+
+    if (AS_NUM(args[1]) < 0) return RETURN_FALSE(args);
+    uint index = cast(uint)AS_NUM(args[1]);
+
+    // Advance to the beginning of the next UTF-8 sequence.
+    do
+    {
+        index++;
+        if (index >= string_.length) return RETURN_FALSE(args);
+    } while ((string_.value[index] & 0xc0) == 0x80);
+
+    return RETURN_NUM(args, index);   
+}
+
+@WrenPrimitive("String", "iterateByte(_)")
+bool string_iterateByte(WrenVM* vm, Value* args) @nogc
+{
+    ObjString* string_ = AS_STRING(args[0]);
+
+    // If we're starting the iteration, return the first index.
+    if (IS_NULL(args[1]))
+    {
+        if (string_.length == 0) return RETURN_FALSE(args);
+        return RETURN_NUM(args, 0);
+    }
+
+    if (!validateInt(vm, args[1], "Iterator")) return false;
+
+    if (AS_NUM(args[1]) < 0) return RETURN_FALSE(args);
+    uint index = cast(uint)AS_NUM(args[1]);
+
+    // Advance to the next byte.
+    index++;
+    if (index >= string_.length) return RETURN_FALSE(args);
+
+    return RETURN_NUM(args, index);   
+}
+
+@WrenPrimitive("String", "iteratorValue(_)")
+bool string_iteratorValue(WrenVM* vm, Value* args) @nogc
+{
+    ObjString* string_ = AS_STRING(args[0]);
+    uint index = validateIndex(vm, args[1], string_.length, "Iterator");
+    if (index == uint.max) return false;
+
+    return RETURN_VAL(args, wrenStringCodePointAt(vm, string_, index));
+}
+
+@WrenPrimitive("String", "+(_)")
+bool string_plus(WrenVM* vm, Value* args) @nogc
+{
+    if (!validateString(vm, args[1], "Right operand")) return false;
+    return RETURN_VAL(args, wrenStringFormat(vm, "@@", args[0], args[1]));
+}
+
+@WrenPrimitive("String", "[_]")
+bool string_subscript(WrenVM* vm, Value* args) @nogc
+{
+    ObjString* string_ = AS_STRING(args[0]);
+
+    if (IS_NUM(args[1]))
+    {
+        int index = validateIndex(vm, args[1], string_.length, "Subscript");
+        if (index == -1) return false;
+
+        return RETURN_VAL(args, wrenStringCodePointAt(vm, string_, index));
+    }
+
+    if (!IS_RANGE(args[1]))
+    {
+        return RETURN_ERROR(vm, "Subscript must be a number or a range.");
+    }
+
+    int step;
+    uint count = string_.length;
+    int start = calculateRange(vm, AS_RANGE(args[1]), &count, &step);
+    if (start == -1) return false;
+
+    return RETURN_VAL(args, wrenNewStringFromRange(vm, string_, start, count, step));
 }
 
 @WrenPrimitive("String", "toString")
