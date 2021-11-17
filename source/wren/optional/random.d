@@ -39,7 +39,7 @@ static void randomAllocate(WrenVM* vm) @nogc
 static void randomSeed0(WrenVM* vm) @nogc
 {
     import core.stdc.stdlib : srand, rand;
-    import core.sys.posix.time : time;
+    import core.stdc.time : time;
 
     Well512* well = cast(Well512*)wrenGetSlotForeign(vm, 0);
 

@@ -1,7 +1,7 @@
 name "wren-d"
 description "A translation of Wren from C to D."
 authors "Harrison Ford"
-copyright "Copyright © 2021, Harrison Ford"
+copyright "Copyright © 2021, int3 Systems, LLC" 
 license "MIT"
 dependency "dplug:core" version="~>12.1.17"
 targetType "library"

@@ -1179,8 +1179,14 @@ bool string_toString(WrenVM* vm, Value* args) @nogc
 @WrenPrimitive("System", "clock")
 bool system_clock(WrenVM* vm, Value* args) @nogc
 {
-    import core.sys.posix.stdc.time : clock, CLOCKS_PER_SEC;
-    return RETURN_NUM(args, cast(double)clock / CLOCKS_PER_SEC);
+    version (Posix) {
+        import core.sys.posix.stdc.time : clock, CLOCKS_PER_SEC;
+        return RETURN_NUM(args, cast(double)clock / CLOCKS_PER_SEC);
+    } else {
+        import core.time : convClockFreq, MonoTime;
+        double t = convClockFreq(MonoTime.currTime.ticks, MonoTime.ticksPerSecond, 1_000_000) * 0.000001;
+        return RETURN_NUM(args, t);
+    }
 }
 
 @WrenPrimitive("System", "gc()")
