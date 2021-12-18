@@ -1,4 +1,4 @@
-name "wren-d"
+name "wren-port"
 description "A translation of Wren from C to D."
 authors "Harrison Ford"
 copyright "Copyright (c) 2013-2021 Robert Nystrom and Wren Contributors" 
