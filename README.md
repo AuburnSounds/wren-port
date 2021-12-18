@@ -4,4 +4,5 @@
 `wren-port` is a port of the Wren programming language implementation to D, intended for embedding. This is useful is you want a `nothrow @nogc` fast interpreter in your D application.
 
 The original Wren implementation is [here](https://github.com/wren-lang).
-This translation was performed by [int3 Systems](https://0xcc.pw/) and sponsored by [Auburn Sounds](auburnsounds.com).
+
+_This translation was performed by [int3 Systems](https://0xcc.pw/) and sponsored by [Auburn Sounds](https://www.auburnsounds.com)._
