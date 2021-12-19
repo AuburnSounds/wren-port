@@ -618,74 +618,154 @@ bool null_toString(WrenVM* vm, Value* args) @nogc
 /++ Num primitives +/
 
 // Porting over macros is always a joy.
-private string DEF_NUM_CONSTANT(string name, string val)
+@WrenPrimitive("Num", "infinity", MethodType.METHOD_PRIMITIVE, true)
+bool num_infinity(WrenVM* vm, Value* args) @nogc
 {
-    import std.format : format;
-
-    return format!q{
-        @WrenPrimitive("Num", "%1$s", MethodType.METHOD_PRIMITIVE, true)
-        bool num_%1$s(WrenVM* vm, Value* args) @nogc
-        {
-            return RETURN_NUM(args, %2$s);
-        }
-    }(name, val);
+    return RETURN_NUM(args, double.infinity);
 }
 
-mixin(DEF_NUM_CONSTANT("infinity", "double.infinity"));
-mixin(DEF_NUM_CONSTANT("nan", "WREN_DOUBLE_NAN"));
-mixin(DEF_NUM_CONSTANT("pi", "3.14159265358979323846264338327950288"));
-mixin(DEF_NUM_CONSTANT("tau", "6.28318530717958647692528676655900577"));
-
-mixin(DEF_NUM_CONSTANT("largest", "double.max"));
-mixin(DEF_NUM_CONSTANT("smallest", "double.min_normal"));
-
-mixin(DEF_NUM_CONSTANT("maxSafeInteger", "9007199254740991.0"));
-mixin(DEF_NUM_CONSTANT("minSafeInteger", "-9007199254740991.0"));
-
-private string DEF_NUM_INFIX(string name, string op, string type)
+@WrenPrimitive("Num", "nan", MethodType.METHOD_PRIMITIVE, true)
+bool num_nan(WrenVM* vm, Value* args) @nogc
 {
-    import std.format : format;
-
-    return format!q{
-        @WrenPrimitive("Num", "%2$s(_)")
-        bool num_%1$s(WrenVM* vm, Value* args) @nogc
-        {
-            if (!validateNum(vm, args[1], "Right operand")) return false;
-            return RETURN_%3$s(args, AS_NUM(args[0]) %2$s AS_NUM(args[1]));
-        }
-    }(name, op, type);
+    return RETURN_NUM(args, WREN_DOUBLE_NAN);
 }
 
-mixin(DEF_NUM_INFIX("minus",    "-",  "NUM"));
-mixin(DEF_NUM_INFIX("plus",     "+",  "NUM"));
-mixin(DEF_NUM_INFIX("multiply", "*",  "NUM"));
-mixin(DEF_NUM_INFIX("divide",   "/",  "NUM"));
-mixin(DEF_NUM_INFIX("lt",       "<",  "BOOL"));
-mixin(DEF_NUM_INFIX("gt",       ">",  "BOOL"));
-mixin(DEF_NUM_INFIX("lte",      "<=", "BOOL"));
-mixin(DEF_NUM_INFIX("gte",      ">=", "BOOL"));
-
-private string DEF_NUM_BITWISE(string name, string op)
+@WrenPrimitive("Num", "pi", MethodType.METHOD_PRIMITIVE, true)
+bool num_pi(WrenVM* vm, Value* args) @nogc
 {
-    import std.format : format;
-
-    return format!q{
-        @WrenPrimitive("Num", "%2$s(_)")
-        bool num_bitwise%1$s(WrenVM* vm, Value* args) @nogc
-        {
-            if (!validateNum(vm, args[1], "Right operand")) return false;
-            uint left = cast(uint)AS_NUM(args[0]);
-            uint right = cast(uint)AS_NUM(args[1]);
-            return RETURN_NUM(args, left %2$s right);
-        }
-    }(name, op);
+    return RETURN_NUM(args, 3.14159265358979323846264338327950288);
 }
 
-mixin(DEF_NUM_BITWISE("And",        "&"));
-mixin(DEF_NUM_BITWISE("Or",         "|"));
-mixin(DEF_NUM_BITWISE("Xor",        "^"));
-mixin(DEF_NUM_BITWISE("LeftShift",  "<<"));
-mixin(DEF_NUM_BITWISE("RightShift", ">>"));
+@WrenPrimitive("Num", "tau", MethodType.METHOD_PRIMITIVE, true)
+bool num_tau(WrenVM* vm, Value* args) @nogc
+{
+    return RETURN_NUM(args, 6.28318530717958647692528676655900577);
+}
+
+@WrenPrimitive("Num", "largest", MethodType.METHOD_PRIMITIVE, true)
+bool num_largest(WrenVM* vm, Value* args) @nogc
+{
+    return RETURN_NUM(args, double.max);
+}
+
+@WrenPrimitive("Num", "smallest", MethodType.METHOD_PRIMITIVE, true)
+bool num_smallest(WrenVM* vm, Value* args) @nogc
+{
+    return RETURN_NUM(args, double.min_normal);
+}
+
+@WrenPrimitive("Num", "maxSafeInteger", MethodType.METHOD_PRIMITIVE, true)
+bool num_maxSafeInteger(WrenVM* vm, Value* args) @nogc
+{
+    return RETURN_NUM(args, 9007199254740991.0);
+}
+
+@WrenPrimitive("Num", "minSafeInteger", MethodType.METHOD_PRIMITIVE, true)
+bool num_minSafeInteger(WrenVM* vm, Value* args) @nogc
+{
+    return RETURN_NUM(args, -9007199254740991.0);
+}
+
+@WrenPrimitive("Num", "-(_)")
+bool num_minus(WrenVM* vm, Value* args) @nogc
+{
+    if (!validateNum(vm, args[1], "Right operand")) return false;
+    return RETURN_NUM(args, AS_NUM(args[0]) - AS_NUM(args[1]));
+}
+
+@WrenPrimitive("Num", "+(_)")
+bool num_plus(WrenVM* vm, Value* args) @nogc
+{
+    if (!validateNum(vm, args[1], "Right operand")) return false;
+    return RETURN_NUM(args, AS_NUM(args[0]) + AS_NUM(args[1]));
+}
+
+@WrenPrimitive("Num", "*(_)")
+bool num_multiply(WrenVM* vm, Value* args) @nogc
+{
+    if (!validateNum(vm, args[1], "Right operand")) return false;
+    return RETURN_NUM(args, AS_NUM(args[0]) * AS_NUM(args[1]));
+}
+
+@WrenPrimitive("Num", "/(_)")
+bool num_divide(WrenVM* vm, Value* args) @nogc
+{
+    if (!validateNum(vm, args[1], "Right operand")) return false;
+    return RETURN_NUM(args, AS_NUM(args[0]) / AS_NUM(args[1]));
+}
+
+@WrenPrimitive("Num", "<(_)")
+bool num_lt(WrenVM* vm, Value* args) @nogc
+{
+    if (!validateNum(vm, args[1], "Right operand")) return false;
+    return RETURN_BOOL(args, AS_NUM(args[0]) < AS_NUM(args[1]));
+}
+
+@WrenPrimitive("Num", ">(_)")
+bool num_gt(WrenVM* vm, Value* args) @nogc
+{
+    if (!validateNum(vm, args[1], "Right operand")) return false;
+    return RETURN_BOOL(args, AS_NUM(args[0]) > AS_NUM(args[1]));
+}
+
+@WrenPrimitive("Num", "<=(_)")
+bool num_lte(WrenVM* vm, Value* args) @nogc
+{
+    if (!validateNum(vm, args[1], "Right operand")) return false;
+    return RETURN_BOOL(args, AS_NUM(args[0]) <= AS_NUM(args[1]));
+}
+
+@WrenPrimitive("Num", ">=(_)")
+bool num_gte(WrenVM* vm, Value* args) @nogc
+{
+    if (!validateNum(vm, args[1], "Right operand")) return false;
+    return RETURN_BOOL(args, AS_NUM(args[0]) >= AS_NUM(args[1]));
+}
+
+@WrenPrimitive("Num", "&(_)")
+bool num_bitwiseAnd(WrenVM* vm, Value* args) @nogc
+{
+    if (!validateNum(vm, args[1], "Right operand")) return false;
+    uint left = cast(uint)AS_NUM(args[0]);
+    uint right = cast(uint)AS_NUM(args[1]);
+    return RETURN_NUM(args, left & right);
+}
+
+@WrenPrimitive("Num", "|(_)")
+bool num_bitwiseOr(WrenVM* vm, Value* args) @nogc
+{
+    if (!validateNum(vm, args[1], "Right operand")) return false;
+    uint left = cast(uint)AS_NUM(args[0]);
+    uint right = cast(uint)AS_NUM(args[1]);
+    return RETURN_NUM(args, left | right);
+}
+
+@WrenPrimitive("Num", "^(_)")
+bool num_bitwiseXor(WrenVM* vm, Value* args) @nogc
+{
+    if (!validateNum(vm, args[1], "Right operand")) return false;
+    uint left = cast(uint)AS_NUM(args[0]);
+    uint right = cast(uint)AS_NUM(args[1]);
+    return RETURN_NUM(args, left ^ right);
+}
+
+@WrenPrimitive("Num", "<<(_)")
+bool num_bitwiseLeftShift(WrenVM* vm, Value* args) @nogc
+{
+    if (!validateNum(vm, args[1], "Right operand")) return false;
+    uint left = cast(uint)AS_NUM(args[0]);
+    uint right = cast(uint)AS_NUM(args[1]);
+    return RETURN_NUM(args, left << right);
+}
+
+@WrenPrimitive("Num", ">>(_)")
+bool num_bitwiseRightShift(WrenVM* vm, Value* args) @nogc
+{
+    if (!validateNum(vm, args[1], "Right operand")) return false;
+    uint left = cast(uint)AS_NUM(args[0]);
+    uint right = cast(uint)AS_NUM(args[1]);
+    return RETURN_NUM(args, left >> right);
+}
 
 private string DEF_NUM_FN(string name, string fn)
 {
