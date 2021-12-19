@@ -295,31 +295,119 @@ bool fn_call0(WrenVM* vm, Value* args) @nogc
     return false;
 }
 
-// This mixin is a mess, but we need to generate the primitives
-// to allow a user to call a function with up to 16 arguments.
-// This is the cleanest that I could make it, but it's still definitely a mess.
-mixin(() {
-    import std.format : format;
-    import std.range : repeat, join;
+// Note: all these call(_) function were a string mixin, but this would make 120 template instantiations.
 
-    string ret = ""; 
+@WrenPrimitive("Fn", "call(_)", MethodType.METHOD_FUNCTION_CALL)
+bool fn_call1(WrenVM* vm, Value* args) @nogc
+{
+    call_fn(vm, args, 1);
+    return false;
+}
 
-    // Build up our argument array here
-    foreach(i; 1 .. 17) {
-        string args = "_" ~ ",_".repeat(i - 1).join;
-        // God have mercy on my soul for this format string
-        ret ~= format!q{
-            @WrenPrimitive("Fn", "call(%1$s)", MethodType.METHOD_FUNCTION_CALL)
-            bool fn_call%2$d(WrenVM* vm, Value* args) @nogc
-            {
-                call_fn(vm, args, %2$d);
-                return false;
-            }
-        }(args, i);
-    }
+@WrenPrimitive("Fn", "call(_,_)", MethodType.METHOD_FUNCTION_CALL)
+bool fn_call2(WrenVM* vm, Value* args) @nogc
+{
+    call_fn(vm, args, 2);
+    return false;
+}
 
-    return ret;
-}());
+@WrenPrimitive("Fn", "call(_,_,_)", MethodType.METHOD_FUNCTION_CALL)
+bool fn_call3(WrenVM* vm, Value* args) @nogc
+{
+    call_fn(vm, args, 3);
+    return false;
+}
+
+@WrenPrimitive("Fn", "call(_,_,_,_)", MethodType.METHOD_FUNCTION_CALL)
+bool fn_call4(WrenVM* vm, Value* args) @nogc
+{
+    call_fn(vm, args, 4);
+    return false;
+}
+
+@WrenPrimitive("Fn", "call(_,_,_,_,_)", MethodType.METHOD_FUNCTION_CALL)
+bool fn_call5(WrenVM* vm, Value* args) @nogc
+{
+    call_fn(vm, args, 5);
+    return false;
+}
+
+@WrenPrimitive("Fn", "call(_,_,_,_,_,_)", MethodType.METHOD_FUNCTION_CALL)
+bool fn_call6(WrenVM* vm, Value* args) @nogc
+{
+    call_fn(vm, args, 6);
+    return false;
+}
+
+@WrenPrimitive("Fn", "call(_,_,_,_,_,_,_)", MethodType.METHOD_FUNCTION_CALL)
+bool fn_call7(WrenVM* vm, Value* args) @nogc
+{
+    call_fn(vm, args, 7);
+    return false;
+}
+
+@WrenPrimitive("Fn", "call(_,_,_,_,_,_,_,_)", MethodType.METHOD_FUNCTION_CALL)
+bool fn_call8(WrenVM* vm, Value* args) @nogc
+{
+    call_fn(vm, args, 8);
+    return false;
+}
+
+@WrenPrimitive("Fn", "call(_,_,_,_,_,_,_,_,_)", MethodType.METHOD_FUNCTION_CALL)
+bool fn_call9(WrenVM* vm, Value* args) @nogc
+{
+    call_fn(vm, args, 9);
+    return false;
+}
+
+@WrenPrimitive("Fn", "call(_,_,_,_,_,_,_,_,_,_)", MethodType.METHOD_FUNCTION_CALL)
+bool fn_call10(WrenVM* vm, Value* args) @nogc
+{
+    call_fn(vm, args, 10);
+    return false;
+}
+
+@WrenPrimitive("Fn", "call(_,_,_,_,_,_,_,_,_,_,_)", MethodType.METHOD_FUNCTION_CALL)
+bool fn_call11(WrenVM* vm, Value* args) @nogc
+{
+    call_fn(vm, args, 11);
+    return false;
+}
+
+@WrenPrimitive("Fn", "call(_,_,_,_,_,_,_,_,_,_,_,_)", MethodType.METHOD_FUNCTION_CALL)
+bool fn_call12(WrenVM* vm, Value* args) @nogc
+{
+    call_fn(vm, args, 12);
+    return false;
+}
+
+@WrenPrimitive("Fn", "call(_,_,_,_,_,_,_,_,_,_,_,_,_)", MethodType.METHOD_FUNCTION_CALL)
+bool fn_call13(WrenVM* vm, Value* args) @nogc
+{
+    call_fn(vm, args, 13);
+    return false;
+}
+
+@WrenPrimitive("Fn", "call(_,_,_,_,_,_,_,_,_,_,_,_,_,_)", MethodType.METHOD_FUNCTION_CALL)
+bool fn_call14(WrenVM* vm, Value* args) @nogc
+{
+    call_fn(vm, args, 14);
+    return false;
+}
+
+@WrenPrimitive("Fn", "call(_,_,_,_,_,_,_,_,_,_,_,_,_,_,_)", MethodType.METHOD_FUNCTION_CALL)
+bool fn_call15(WrenVM* vm, Value* args) @nogc
+{
+    call_fn(vm, args, 15);
+    return false;
+}
+
+@WrenPrimitive("Fn", "call(_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_)", MethodType.METHOD_FUNCTION_CALL)
+bool fn_call16(WrenVM* vm, Value* args) @nogc
+{
+    call_fn(vm, args, 16);
+    return false;
+}
 
 @WrenPrimitive("Fn", "toString")
 bool fn_toString(WrenVM* vm, Value* args) @nogc
