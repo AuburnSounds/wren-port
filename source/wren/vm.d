@@ -1212,52 +1212,51 @@ static WrenInterpretResult runInterpreter(WrenVM* vm, ObjFiber* fiber)
     Method* method;
 
     // These macros are designed to only be invoked within this function.
-    pragma(inline, true)
-    void PUSH(Value value) {
+    void PUSH(Value value) 
+    {
         *fiber.stackTop++ = value;
     }
 
-    pragma(inline, true)
-    Value POP() {
+    Value POP() 
+    {
         return (*(--fiber.stackTop));
     }
 
-    pragma(inline, true)
-    void DROP() {
+    void DROP() 
+    {
         fiber.stackTop--;
     }
 
-    pragma(inline, true)
-    Value PEEK() {
+    Value PEEK() 
+    {
         return (*(fiber.stackTop - 1));
     }
 
-    pragma(inline, true)
-    Value PEEK2() {
+    Value PEEK2() 
+    {
         return (*(fiber.stackTop - 2));
     }
 
-    pragma(inline, true)
-    ubyte READ_BYTE() {
+    ubyte READ_BYTE() 
+    {
         return (*ip++);
     }
 
-    pragma(inline, true)
-    ushort READ_SHORT() {
+    ushort READ_SHORT() 
+    {
         ip += 2;
         return cast(ushort)((ip[-2] << 8) | ip[-1]);
     }
 
     // Use this before a CallFrame is pushed to store the local variables back
     // into the current one.
-    pragma(inline, true)
-    void STORE_FRAME() {
+    void STORE_FRAME() 
+    {
         frame.ip = ip;
     }
 
     // Use this after a CallFrame has been pushed or popped to refresh the local
     // variables.
-    pragma(inline, true)
     void LOAD_FRAME() {
         frame = &fiber.frames[fiber.numFrames - 1];
         stackStart = frame.stackStart;
