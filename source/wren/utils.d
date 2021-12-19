@@ -1,56 +1,86 @@
 module wren.utils;
 
-// We need buffers of a few different types.
-// No pre-processor here -- realistically, this should be a mixin template,
-// but a mixin template... still requires mixins to declare our functions like this.
-// We also can't technically mark this @nogc, since std.format *does* use the GC
-// but this should *only* ever be run at compile-time.
-package string DECLARE_BUFFER(string name, string type) {
-    if (!__ctfe) assert(0, "This function should never be run outside of CTFE.");
+struct ByteBuffer
+{
+    ubyte* data;
+    int count;
+    int capacity;
+};
 
-    import std.format : format;
-
-    return format!q"{
-    struct %1$sBuffer {
-        %2$s* data;
-        int count;
-        int capacity;
-    };
-
-    void wren%1$sBufferInit(%1$sBuffer* buffer) @nogc {
-        buffer.data = null;
-        buffer.capacity = 0;
-        buffer.count = 0;
-    }
-
-    void wren%1$sBufferClear(VM)(VM* vm, %1$sBuffer* buffer) @nogc {
-        import wren.vm : wrenReallocate;
-        wrenReallocate(vm, buffer.data, 0, 0);
-        wren%1$sBufferInit(buffer);
-    }
-
-    void wren%1$sBufferFill(VM)(VM* vm, %1$sBuffer* buffer, %2$s data, int count) @nogc {
-        import wren.vm : wrenReallocate;
-        if (buffer.capacity < buffer.count + count) {
-            int capacity = wrenPowerOf2Ceil(buffer.count + count);
-            buffer.data = cast(%2$s*)wrenReallocate(vm, buffer.data, 
-                buffer.capacity * (%2$s).sizeof, capacity * (%2$s).sizeof);
-            buffer.capacity = capacity;
-        }
-
-        for (int i = 0; i < count; i++) {
-            buffer.data[buffer.count++] = data;
-        }
-    }
-
-    void wren%1$sBufferWrite(VM)(VM* vm, %1$sBuffer* buffer, %2$s data) @nogc {
-        wren%1$sBufferFill(vm, buffer, data, 1);
-    }
-    }"(name, type);
+void wrenByteBufferInit(ByteBuffer* buffer) nothrow @nogc
+{
+    buffer.data = null;
+    buffer.capacity = 0;
+    buffer.count = 0;
 }
 
-mixin(DECLARE_BUFFER("Byte", "ubyte"));
-mixin(DECLARE_BUFFER("Int", "int"));
+void wrenByteBufferClear(VM)(VM* vm, ByteBuffer* buffer) @nogc
+{
+    import wren.vm : wrenReallocate;
+    wrenReallocate(vm, buffer.data, 0, 0);
+    wrenByteBufferInit(buffer);
+}
+
+void wrenByteBufferFill(VM)(VM* vm, ByteBuffer* buffer, ubyte data, int count) @nogc
+{
+    import wren.vm : wrenReallocate;
+    if (buffer.capacity < buffer.count + count) {
+        int capacity = wrenPowerOf2Ceil(buffer.count + count);
+        buffer.data = cast(ubyte*)wrenReallocate(vm, buffer.data,
+                                                 buffer.capacity * (ubyte).sizeof, capacity * (ubyte).sizeof);
+        buffer.capacity = capacity;
+    }
+
+    for (int i = 0; i < count; i++) {
+        buffer.data[buffer.count++] = data;
+    }
+}
+
+void wrenByteBufferWrite(VM)(VM* vm, ByteBuffer* buffer, ubyte data) @nogc
+{
+    wrenByteBufferFill(vm, buffer, data, 1);
+}
+
+struct IntBuffer
+{
+    int* data;
+    int count;
+    int capacity;
+};
+
+void wrenIntBufferInit(IntBuffer* buffer) nothrow @nogc
+{
+    buffer.data = null;
+    buffer.capacity = 0;
+    buffer.count = 0;
+}
+
+void wrenIntBufferClear(VM)(VM* vm, IntBuffer* buffer) @nogc
+{
+    import wren.vm : wrenReallocate;
+    wrenReallocate(vm, buffer.data, 0, 0);
+    wrenIntBufferInit(buffer);
+}
+
+void wrenIntBufferFill(VM)(VM* vm, IntBuffer* buffer, int data, int count) @nogc
+{
+    import wren.vm : wrenReallocate;
+    if (buffer.capacity < buffer.count + count) {
+        int capacity = wrenPowerOf2Ceil(buffer.count + count);
+        buffer.data = cast(int*)wrenReallocate(vm, buffer.data,
+                                               buffer.capacity * (int).sizeof, capacity * (int).sizeof);
+        buffer.capacity = capacity;
+    }
+
+    for (int i = 0; i < count; i++) {
+        buffer.data[buffer.count++] = data;
+    }
+}
+
+void wrenIntBufferWrite(VM)(VM* vm, IntBuffer* buffer, int data) @nogc
+{
+    wrenIntBufferFill(vm, buffer, data, 1);
+}
 
 // Returns the number of bytes needed to encode [value] in UTF-8.
 //
@@ -186,7 +216,7 @@ int wrenUtf8DecodeNumBytes(ubyte byte_) @nogc
 
 // From: http://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2Float
 // Returns the smallest power of two that is equal to or greater than [n].
-int wrenPowerOf2Ceil(int n) @nogc
+int wrenPowerOf2Ceil(int n) nothrow @nogc
 {
   n--;
   n |= n >> 1;

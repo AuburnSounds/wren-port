@@ -93,7 +93,48 @@ else
     }
 }
 
-mixin(DECLARE_BUFFER("Value", "Value"));
+
+struct ValueBuffer
+{
+    Value* data;
+    int count;
+    int capacity;
+};
+
+void wrenValueBufferInit(ValueBuffer* buffer) nothrow @nogc
+{
+    buffer.data = null;
+    buffer.capacity = 0;
+    buffer.count = 0;
+}
+
+void wrenValueBufferClear(VM)(VM* vm, ValueBuffer* buffer) @nogc
+{
+    import wren.vm : wrenReallocate;
+    wrenReallocate(vm, buffer.data, 0, 0);
+    wrenValueBufferInit(buffer);
+}
+
+void wrenValueBufferFill(VM)(VM* vm, ValueBuffer* buffer, Value data, int count) @nogc
+{
+    import wren.vm : wrenReallocate;
+    if (buffer.capacity < buffer.count + count) {
+        int capacity = wrenPowerOf2Ceil(buffer.count + count);
+        buffer.data = cast(Value*)wrenReallocate(vm, buffer.data,
+                                                 buffer.capacity * (Value).sizeof, capacity * (Value).sizeof);
+        buffer.capacity = capacity;
+    }
+
+    for (int i = 0; i < count; i++) {
+        buffer.data[buffer.count++] = data;
+    }
+}
+
+void wrenValueBufferWrite(VM)(VM* vm, ValueBuffer* buffer, Value data) @nogc
+{
+    wrenValueBufferFill(vm, buffer, data, 1);
+}
+
 
 // These macros cast a Value to one of the specific object types. These do *not*
 // perform any validation, so must only be used after the Value has been
@@ -242,7 +283,47 @@ struct ObjString
     char[] value;
 }
 
-mixin(DECLARE_BUFFER("String", "ObjString*"));
+struct StringBuffer
+{
+    ObjString** data;
+    int count;
+    int capacity;
+};
+
+void wrenStringBufferInit(StringBuffer* buffer) nothrow @nogc
+{
+    buffer.data = null;
+    buffer.capacity = 0;
+    buffer.count = 0;
+}
+
+void wrenStringBufferClear(VM)(VM* vm, StringBuffer* buffer) @nogc
+{
+    import wren.vm : wrenReallocate;
+    wrenReallocate(vm, buffer.data, 0, 0);
+    wrenStringBufferInit(buffer);
+}
+
+void wrenStringBufferFill(VM)(VM* vm, StringBuffer* buffer, ObjString* data, int count) @nogc
+{
+    import wren.vm : wrenReallocate;
+    if (buffer.capacity < buffer.count + count) {
+        int capacity = wrenPowerOf2Ceil(buffer.count + count);
+        buffer.data = cast(ObjString**)wrenReallocate(vm, buffer.data,
+                                                      buffer.capacity * (ObjString*).sizeof, capacity * (ObjString*).sizeof);
+        buffer.capacity = capacity;
+    }
+
+    for (int i = 0; i < count; i++) {
+        buffer.data[buffer.count++] = data;
+    }
+}
+
+void wrenStringBufferWrite(VM)(VM* vm, StringBuffer* buffer, ObjString* data) @nogc
+{
+    wrenStringBufferFill(vm, buffer, data, 1);
+}
+
 
 alias SymbolTable = StringBuffer;
 
@@ -533,7 +614,46 @@ struct Method
     AsType as;
 }
 
-mixin(DECLARE_BUFFER("Method", "Method"));
+struct MethodBuffer
+{
+    Method* data;
+    int count;
+    int capacity;
+};
+
+void wrenMethodBufferInit(MethodBuffer* buffer) nothrow @nogc
+{
+    buffer.data = null;
+    buffer.capacity = 0;
+    buffer.count = 0;
+}
+
+void wrenMethodBufferClear(VM)(VM* vm, MethodBuffer* buffer) @nogc
+{
+    import wren.vm : wrenReallocate;
+    wrenReallocate(vm, buffer.data, 0, 0);
+    wrenMethodBufferInit(buffer);
+}
+
+void wrenMethodBufferFill(VM)(VM* vm, MethodBuffer* buffer, Method data, int count) @nogc
+{
+    import wren.vm : wrenReallocate;
+    if (buffer.capacity < buffer.count + count) {
+        int capacity = wrenPowerOf2Ceil(buffer.count + count);
+        buffer.data = cast(Method*)wrenReallocate(vm, buffer.data,
+                                                  buffer.capacity * (Method).sizeof, capacity * (Method).sizeof);
+        buffer.capacity = capacity;
+    }
+
+    for (int i = 0; i < count; i++) {
+        buffer.data[buffer.count++] = data;
+    }
+}
+
+void wrenMethodBufferWrite(VM)(VM* vm, MethodBuffer* buffer, Method data) @nogc
+{
+    wrenMethodBufferFill(vm, buffer, data, 1);
+}
 
 struct ObjClass
 {
