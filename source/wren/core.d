@@ -767,35 +767,112 @@ bool num_bitwiseRightShift(WrenVM* vm, Value* args) @nogc
     return RETURN_NUM(args, left >> right);
 }
 
-private string DEF_NUM_FN(string name, string fn)
-{
-    import std.format : format;
+// Numeric functions
 
-    return format!q{
-        @WrenPrimitive("Num", "%1$s")
-        bool num_%1$s(WrenVM* vm, Value* args) @nogc
-        {
-            import core.stdc.math : %2$s;
-            return RETURN_NUM(args, %2$s(AS_NUM(args[0])));
-        }
-    }(name, fn);
+@WrenPrimitive("Num", "abs")
+bool num_abs(WrenVM* vm, Value* args) @nogc
+{
+    import core.stdc.math : fabs;
+    return RETURN_NUM(args, fabs(AS_NUM(args[0])));
 }
 
-mixin(DEF_NUM_FN("abs", "fabs"));
-mixin(DEF_NUM_FN("acos", "acos"));
-mixin(DEF_NUM_FN("asin", "asin"));
-mixin(DEF_NUM_FN("atan", "atan"));
-mixin(DEF_NUM_FN("cbrt", "cbrt"));
-mixin(DEF_NUM_FN("ceil", "ceil"));
-mixin(DEF_NUM_FN("cos", "cos"));
-mixin(DEF_NUM_FN("floor", "floor"));
-mixin(DEF_NUM_FN("round", "round"));
-mixin(DEF_NUM_FN("sin", "sin"));
-mixin(DEF_NUM_FN("sqrt", "sqrt"));
-mixin(DEF_NUM_FN("tan", "tan"));
-mixin(DEF_NUM_FN("log", "log"));
-mixin(DEF_NUM_FN("log2", "log2"));
-mixin(DEF_NUM_FN("exp", "exp"));
+@WrenPrimitive("Num", "acos")
+bool num_acos(WrenVM* vm, Value* args) @nogc
+{
+    import core.stdc.math : acos;
+    return RETURN_NUM(args, acos(AS_NUM(args[0])));
+}
+
+@WrenPrimitive("Num", "asin")
+bool num_asin(WrenVM* vm, Value* args) @nogc
+{
+    import core.stdc.math : asin;
+    return RETURN_NUM(args, asin(AS_NUM(args[0])));
+}
+
+@WrenPrimitive("Num", "atan")
+bool num_atan(WrenVM* vm, Value* args) @nogc
+{
+    import core.stdc.math : atan;
+    return RETURN_NUM(args, atan(AS_NUM(args[0])));
+}
+
+@WrenPrimitive("Num", "cbrt")
+bool num_cbrt(WrenVM* vm, Value* args) @nogc
+{
+    import core.stdc.math : cbrt;
+    return RETURN_NUM(args, cbrt(AS_NUM(args[0])));
+}
+
+@WrenPrimitive("Num", "ceil")
+bool num_ceil(WrenVM* vm, Value* args) @nogc
+{
+    import core.stdc.math : ceil;
+    return RETURN_NUM(args, ceil(AS_NUM(args[0])));
+}
+
+@WrenPrimitive("Num", "cos")
+bool num_cos(WrenVM* vm, Value* args) @nogc
+{
+    import core.stdc.math : cos;
+    return RETURN_NUM(args, cos(AS_NUM(args[0])));
+}
+
+@WrenPrimitive("Num", "floor")
+bool num_floor(WrenVM* vm, Value* args) @nogc
+{
+    import core.stdc.math : floor;
+    return RETURN_NUM(args, floor(AS_NUM(args[0])));
+}
+
+@WrenPrimitive("Num", "round")
+bool num_round(WrenVM* vm, Value* args) @nogc
+{
+    import core.stdc.math : round;
+    return RETURN_NUM(args, round(AS_NUM(args[0])));
+}
+
+@WrenPrimitive("Num", "sin")
+bool num_sin(WrenVM* vm, Value* args) @nogc
+{
+    import core.stdc.math : sin;
+    return RETURN_NUM(args, sin(AS_NUM(args[0])));
+}
+
+@WrenPrimitive("Num", "sqrt")
+bool num_sqrt(WrenVM* vm, Value* args) @nogc
+{
+    import core.stdc.math : sqrt;
+    return RETURN_NUM(args, sqrt(AS_NUM(args[0])));
+}
+
+@WrenPrimitive("Num", "tan")
+bool num_tan(WrenVM* vm, Value* args) @nogc
+{
+    import core.stdc.math : tan;
+    return RETURN_NUM(args, tan(AS_NUM(args[0])));
+}
+
+@WrenPrimitive("Num", "log")
+bool num_log(WrenVM* vm, Value* args) @nogc
+{
+    import core.stdc.math : log;
+    return RETURN_NUM(args, log(AS_NUM(args[0])));
+}
+
+@WrenPrimitive("Num", "log2")
+bool num_log2(WrenVM* vm, Value* args) @nogc
+{
+    import core.stdc.math : log2;
+    return RETURN_NUM(args, log2(AS_NUM(args[0])));
+}
+
+@WrenPrimitive("Num", "exp")
+bool num_exp(WrenVM* vm, Value* args) @nogc
+{
+    import core.stdc.math : exp;
+    return RETURN_NUM(args, exp(AS_NUM(args[0])));
+}
 
 @WrenPrimitive("Num", "-")
 bool num_negate(WrenVM* vm, Value* args) @nogc
