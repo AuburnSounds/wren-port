@@ -8,7 +8,7 @@ __gshared WrenVM* vm;
 //
 // Returns `NULL` if the path could not be found. Exits if it was found but
 // could not be read.
-static char* readFile(const char* path) @nogc
+char* readFile(const char* path) @nogc
 {
     import core.stdc.stdio : fopen, FILE, fread, fseek, ftell, rewind, fprintf, fclose, SEEK_END, stderr;
     import core.stdc.stdlib : malloc;
@@ -44,14 +44,14 @@ static char* readFile(const char* path) @nogc
     return buffer;
 }
 
-static void write(WrenVM* vm, const(char)* text) @nogc
+void write(WrenVM* vm, const(char)* text) @nogc
 {
     import core.stdc.stdio : printf;
     printf("%s", text);
 }
 
-static void reportError(WrenVM* vm, WrenErrorType type,
-                        const(char)* module_, int line, const(char)* message) @nogc
+void reportError(WrenVM* vm, WrenErrorType type,
+                 const(char)* module_, int line, const(char)* message) @nogc
 {
     import core.stdc.stdio : fprintf, stderr;
 
@@ -73,7 +73,7 @@ static void reportError(WrenVM* vm, WrenErrorType type,
     }
 }
 
-static void initVM()
+void initVM()
 {
     WrenConfiguration config;
     wrenInitConfiguration(&config);
@@ -86,7 +86,7 @@ static void initVM()
     vm = wrenNewVM(&config);
 }
 
-static void freeVM()
+void freeVM()
 {
     wrenFreeVM(vm);
 }

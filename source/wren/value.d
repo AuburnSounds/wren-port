@@ -941,7 +941,7 @@ else
 
 // Returns true if [a] and [b] are strictly the same value. This is identity
 // for object values, and value equality for unboxed values.
-static bool wrenValuesSame(Value a, Value b)
+bool wrenValuesSame(Value a, Value b)
 {
     static if (WREN_NAN_TAGGING)
     {
@@ -957,7 +957,7 @@ static bool wrenValuesSame(Value a, Value b)
 
 // Returns true if [value] is a bool. Do not call this directly, instead use
 // [IS_BOOL].
-static bool wrenIsBool(Value value)
+bool wrenIsBool(Value value)
 {
     static if (WREN_NAN_TAGGING)
     {
@@ -971,13 +971,13 @@ static bool wrenIsBool(Value value)
 
 // Returns true if [value] is an object of type [type]. Do not call this
 // directly, instead use the [IS___] macro for the type in question.
-static bool wrenIsObjType(Value value, ObjType type)
+bool wrenIsObjType(Value value, ObjType type)
 {
     return IS_OBJ(value) && AS_OBJ(value).type == type;
 }
 
 // Converts the raw object pointer [obj] to a [Value].
-static Value wrenObjectToValue(Obj* obj)
+Value wrenObjectToValue(Obj* obj)
 {
     static if (WREN_NAN_TAGGING)
     {
@@ -993,7 +993,7 @@ static Value wrenObjectToValue(Obj* obj)
 }
 
 // Interprets [value] as a [double].
-static double wrenValueToNum(Value value)
+double wrenValueToNum(Value value)
 {
     static if (WREN_NAN_TAGGING)
     {
@@ -1006,7 +1006,7 @@ static double wrenValueToNum(Value value)
 }
 
 // Converts [num] to a [Value].
-static Value wrenNumToValue(double num)
+Value wrenNumToValue(double num)
 {
     static if (WREN_NAN_TAGGING)
     {
@@ -1024,7 +1024,7 @@ static Value wrenNumToValue(double num)
 // Validates that [arg] is a valid object for use as a map key. Returns true if
 // it is and returns false otherwise. Use validateKey usually, for a runtime error.
 // This separation exists to aid the API in surfacing errors to the developer as well.
-static bool wrenMapIsValidKey(Value arg)
+bool wrenMapIsValidKey(Value arg)
 {
     return IS_BOOL(arg)
       || IS_CLASS(arg)
@@ -1274,7 +1274,7 @@ void wrenEnsureStack(WrenVM* vm, ObjFiber* fiber, int needed)
     }
 }
 
-static bool wrenHasError(ObjFiber* fiber)
+bool wrenHasError(ObjFiber* fiber)
 {
     return !IS_NULL(fiber.error);
 }
@@ -1427,7 +1427,7 @@ ObjMap* wrenNewMap(WrenVM* vm)
     return map;
 }
 
-static uint hashBits(ulong hash)
+uint hashBits(ulong hash)
 {
     // From v8's ComputeLongHash() which in turn cites:
     // Thomas Wang, Integer Hash Functions.
@@ -1442,14 +1442,14 @@ static uint hashBits(ulong hash)
 }
 
 // Generates a hash code for [num].
-static uint hashNumber(double num)
+uint hashNumber(double num)
 {
     // Hash the raw bits of the value.
     return hashBits(wrenDoubleToBits(num));
 }
 
 // Generates a hash code for [object].
-static uint hashObject(Obj* object)
+uint hashObject(Obj* object)
 {
     switch (object.type)
     {
@@ -1483,7 +1483,7 @@ static uint hashObject(Obj* object)
 
 // Generates a hash code for [value], which must be one of the built-in
 // immutable types: null, bool, class, num, range, or string.
-static uint hashValue(Value value)
+uint hashValue(Value value)
 {
     // TODO: We'll probably want to randomize this at some point.
     static if (WREN_NAN_TAGGING)
@@ -1512,8 +1512,7 @@ static uint hashValue(Value value)
 // If found, sets [result] to point to it and returns `true`. Otherwise,
 // returns `false` and points [result] to the entry where the key/value pair
 // should be inserted.
-static bool findEntry(MapEntry* entries, uint capacity, Value key,
-                      MapEntry** result)
+bool findEntry(MapEntry* entries, uint capacity, Value key, MapEntry** result)
 {
     // If there is no entry array (an empty map), we definitely won't find it.
     if (capacity == 0) return false;
@@ -1576,8 +1575,7 @@ static bool findEntry(MapEntry* entries, uint capacity, Value key,
 // [capacity].
 //
 // Returns `true` if this is the first time [key] was added to the map.
-static bool insertEntry(MapEntry* entries, uint capacity,
-                        Value key, Value value)
+bool insertEntry(MapEntry* entries, uint capacity, Value key, Value value)
 {
     assert(entries != null, "Should ensure capacity before inserting.");
     
@@ -1597,7 +1595,7 @@ static bool insertEntry(MapEntry* entries, uint capacity,
 }
 
 // Updates [map]'s entry array to [capacity].
-static void resizeMap(WrenVM* vm, ObjMap* map, uint capacity)
+void resizeMap(WrenVM* vm, ObjMap* map, uint capacity)
 {
     // Create the new empty hash table.
     MapEntry* entries = ALLOCATE_ARRAY!(WrenVM, MapEntry)(vm, capacity);
@@ -1749,7 +1747,7 @@ static ObjString* allocateString(WrenVM* vm, size_t length)
     return str;
 }
 
-static void hashString(ObjString* str)
+void hashString(ObjString* str)
 {
     // FNV-1a hash. See: http://www.isthe.com/chongo/tech/comp/fnv/
     uint hash = 2166136261u;
@@ -2070,7 +2068,7 @@ uint wrenStringFind(ObjString* haystack, ObjString* needle, uint start)
 }
 
 // Returns true if [a] and [b] represent the same string.
-static bool wrenStringEqualsCString(ObjString* a, const(char)* b, size_t length)
+bool wrenStringEqualsCString(ObjString* a, const(char)* b, size_t length)
 {
     import core.stdc.string : memcmp;
     return a.length == length && memcmp(a.value.ptr, b, length) == 0;
@@ -2134,7 +2132,7 @@ void wrenGrayBuffer(WrenVM* vm, ValueBuffer* buffer)
     }
 }
 
-static void blackenClass(WrenVM* vm, ObjClass* classObj)
+void blackenClass(WrenVM* vm, ObjClass* classObj)
 {
     // The metaclass.
     wrenGrayObj(vm, cast(Obj*)classObj.obj.classObj);
@@ -2160,7 +2158,7 @@ static void blackenClass(WrenVM* vm, ObjClass* classObj)
     vm.bytesAllocated += classObj.methods.capacity * Method.sizeof;
 }
 
-static void blackenClosure(WrenVM* vm, ObjClosure* closure)
+void blackenClosure(WrenVM* vm, ObjClosure* closure)
 {
     // Mark the function.
     wrenGrayObj(vm, cast(Obj*)closure.fn);
@@ -2176,7 +2174,7 @@ static void blackenClosure(WrenVM* vm, ObjClosure* closure)
     vm.bytesAllocated += (ObjUpvalue*).sizeof * closure.fn.numUpvalues;
 }
 
-static void blackenFiber(WrenVM* vm, ObjFiber* fiber)
+void blackenFiber(WrenVM* vm, ObjFiber* fiber)
 {
     // Stack functions.
 
@@ -2209,7 +2207,7 @@ static void blackenFiber(WrenVM* vm, ObjFiber* fiber)
     vm.bytesAllocated += fiber.stackCapacity * Value.sizeof;
 }
 
-static void blackenFn(WrenVM* vm, ObjFn* fn)
+void blackenFn(WrenVM* vm, ObjFn* fn)
 {
   // Mark the constants.
   wrenGrayBuffer(vm, &fn.constants);
@@ -2224,7 +2222,7 @@ static void blackenFn(WrenVM* vm, ObjFn* fn)
   // TODO: What about the function name?
 }
 
-static void blackenForeign(WrenVM* vm, ObjForeign* foreign)
+void blackenForeign(WrenVM* vm, ObjForeign* foreign)
 {
   // TODO: Keep track of how much memory the foreign object uses. We can store
   // this in each foreign object, but it will balloon the size. We may not want
@@ -2233,7 +2231,7 @@ static void blackenForeign(WrenVM* vm, ObjForeign* foreign)
   // always have to explicitly store it.
 }
 
-static void blackenInstance(WrenVM* vm, ObjInstance* instance)
+void blackenInstance(WrenVM* vm, ObjInstance* instance)
 {
   wrenGrayObj(vm, cast(Obj*)instance.obj.classObj);
 
@@ -2248,7 +2246,7 @@ static void blackenInstance(WrenVM* vm, ObjInstance* instance)
   vm.bytesAllocated += Value.sizeof * instance.obj.classObj.numFields;
 }
 
-static void blackenList(WrenVM* vm, ObjList* list)
+void blackenList(WrenVM* vm, ObjList* list)
 {
   // Mark the elements.
   wrenGrayBuffer(vm, &list.elements);
@@ -2258,7 +2256,7 @@ static void blackenList(WrenVM* vm, ObjList* list)
   vm.bytesAllocated += Value.sizeof * list.elements.capacity;
 }
 
-static void blackenMap(WrenVM* vm, ObjMap* map)
+void blackenMap(WrenVM* vm, ObjMap* map)
 {
   // Mark the entries.
   for (uint i = 0; i < map.capacity; i++)
@@ -2275,7 +2273,7 @@ static void blackenMap(WrenVM* vm, ObjMap* map)
   vm.bytesAllocated += MapEntry.sizeof * map.capacity;
 }
 
-static void blackenModule(WrenVM* vm, ObjModule* module_)
+void blackenModule(WrenVM* vm, ObjModule* module_)
 {
   // Top-level variables.
   for (int i = 0; i < module_.variables.count; i++)
@@ -2291,19 +2289,19 @@ static void blackenModule(WrenVM* vm, ObjModule* module_)
   vm.bytesAllocated += ObjModule.sizeof;
 }
 
-static void blackenRange(WrenVM* vm, ObjRange* range)
+void blackenRange(WrenVM* vm, ObjRange* range)
 {
   // Keep track of how much memory is still in use.
   vm.bytesAllocated += ObjRange.sizeof;
 }
 
-static void blackenString(WrenVM* vm, ObjString* str)
+void blackenString(WrenVM* vm, ObjString* str)
 {
   // Keep track of how much memory is still in use.
   vm.bytesAllocated += ObjString.sizeof + str.length + 1;
 }
 
-static void blackenUpvalue(WrenVM* vm, ObjUpvalue* upvalue)
+void blackenUpvalue(WrenVM* vm, ObjUpvalue* upvalue)
 {
     // Mark the closed-over object (in case it is closed).
     wrenGrayValue(vm, upvalue.closed);
@@ -2312,7 +2310,7 @@ static void blackenUpvalue(WrenVM* vm, ObjUpvalue* upvalue)
     vm.bytesAllocated += ObjUpvalue.sizeof;
 }
 
-static void blackenObject(WrenVM* vm, Obj* obj)
+void blackenObject(WrenVM* vm, Obj* obj)
 {
     static if (WREN_DEBUG_TRACE_MEMORY)
     {

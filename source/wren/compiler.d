@@ -399,8 +399,8 @@ struct Variable
 }
 
 import core.stdc.stdarg;
-static void printError(Parser* parser, int line, const(char)* label,
-                       const(char)* format, va_list args)
+void printError(Parser* parser, int line, const(char)* label,
+                const(char)* format, va_list args)
 {
     import core.stdc.stdio;
     parser.hasError = true;
@@ -426,7 +426,7 @@ static void printError(Parser* parser, int line, const(char)* label,
 }
 
 // Outputs a lexical error.
-static void lexError(Parser* parser, const char* format, ...)
+void lexError(Parser* parser, const char* format, ...)
 {
     va_list args;
     va_start(args, format);
@@ -516,8 +516,8 @@ static int addConstant(Compiler* compiler, Value constant)
 }
 
 // Initializes [compiler].
-static void initCompiler(Compiler* compiler, Parser* parser, Compiler* parent,
-                         bool isMethod)
+void initCompiler(Compiler* compiler, Parser* parser, Compiler* parent,
+                  bool isMethod)
 {
     compiler.parser = parser;
     compiler.parent = parent;
@@ -654,7 +654,7 @@ static bool matchChar(Parser* parser, char c)
 
 // Sets the parser's current token to the given [type] and current character
 // range.
-static void makeToken(Parser* parser, TokenType type)
+void makeToken(Parser* parser, TokenType type)
 {
     parser.next.type = type;
     parser.next.start = parser.tokenStart;
@@ -667,13 +667,13 @@ static void makeToken(Parser* parser, TokenType type)
 
 // If the current character is [c], then consumes it and makes a token of type
 // [two]. Otherwise makes a token of type [one].
-static void twoCharToken(Parser* parser, char c, TokenType two, TokenType one)
+void twoCharToken(Parser* parser, char c, TokenType two, TokenType one)
 {
     makeToken(parser, matchChar(parser, c) ? two : one);
 }
 
 // Skips the rest of the current line.
-static void skipLineComment(Parser* parser)
+void skipLineComment(Parser* parser)
 {
     while (peekChar(parser) != '\n' && peekChar(parser) != '\0')
     {
@@ -682,7 +682,7 @@ static void skipLineComment(Parser* parser)
 }
 
 // Skips the rest of a block comment.
-static void skipBlockComment(Parser* parser)
+void skipBlockComment(Parser* parser)
 {
     int nesting = 1;
     while (nesting > 0)
@@ -730,7 +730,7 @@ static int readHexDigit(Parser* parser)
 }
 
 // Parses the numeric value of the current token.
-static void makeNumber(Parser* parser, bool isHex)
+void makeNumber(Parser* parser, bool isHex)
 {
     import core.stdc.errno;
     import core.stdc.stdlib;
@@ -759,7 +759,7 @@ static void makeNumber(Parser* parser, bool isHex)
 }
 
 // Finishes lexing a hexadecimal number literal.
-static void readHexNumber(Parser* parser)
+void readHexNumber(Parser* parser)
 {
     // Skip past the `x` used to denote a hexadecimal literal.
     nextChar(parser);
@@ -771,7 +771,7 @@ static void readHexNumber(Parser* parser)
 }
 
 // Finishes lexing a number literal.
-static void readNumber(Parser* parser)
+void readNumber(Parser* parser)
 {
     while (isDigit(peekChar(parser))) nextChar(parser);
 
@@ -804,7 +804,7 @@ static void readNumber(Parser* parser)
 }
 
 // Finishes lexing an identifier. Handles reserved words.
-static void readName(Parser* parser, TokenType type, char firstChar)
+void readName(Parser* parser, TokenType type, char firstChar)
 {
     ByteBuffer string_;
     wrenByteBufferInit(&string_);
@@ -866,7 +866,7 @@ static int readHexEscape(Parser* parser, int digits, const char* description)
 }
 
 // Reads a hex digit Unicode escape sequence in a string literal.
-static void readUnicodeEscape(Parser* parser, ByteBuffer* string_, int length)
+void readUnicodeEscape(Parser* parser, ByteBuffer* string_, int length)
 {
   int value = readHexEscape(parser, length, "Unicode");
 
@@ -879,7 +879,7 @@ static void readUnicodeEscape(Parser* parser, ByteBuffer* string_, int length)
   }
 }
 
-static void readRawString(Parser* parser)
+void readRawString(Parser* parser)
 {
     ByteBuffer string_;
     wrenByteBufferInit(&string_);
@@ -957,7 +957,7 @@ static void readRawString(Parser* parser)
 }
 
 // Finishes lexing a string literal.
-static void readString(Parser* parser)
+void readString(Parser* parser)
 {
     ByteBuffer string_;
     TokenType type = TokenType.TOKEN_STRING;
@@ -1038,7 +1038,7 @@ static void readString(Parser* parser)
 }
 
 // Lex the next token and store it in [parser.next].
-static void nextToken(Parser* parser)
+void nextToken(Parser* parser)
 {
     parser.previous = parser.current;
     parser.current = parser.next;
@@ -1468,7 +1468,7 @@ static void defineVariable(Compiler* compiler, int symbol)
 }
 
 // Starts a new local block scope.
-static void pushScope(Compiler* compiler)
+void pushScope(Compiler* compiler)
 {
     compiler.scopeDepth++;
 }
@@ -1512,7 +1512,7 @@ static int discardLocals(Compiler* compiler, int depth)
 // Closes the last pushed block scope and discards any local variables declared
 // in that scope. This should only be called in a statement context where no
 // temporaries are still on the stack.
-static void popScope(Compiler* compiler)
+void popScope(Compiler* compiler)
 {
     int popped = discardLocals(compiler, compiler.scopeDepth);
     compiler.numLocals -= popped;
@@ -1638,7 +1638,7 @@ static Variable resolveName(Compiler* compiler, const char* name, int length)
     return variable;
 }
 
-static void loadLocal(Compiler* compiler, int slot)
+void loadLocal(Compiler* compiler, int slot)
 {
     if (slot <= 8)
     {
@@ -1739,7 +1739,7 @@ struct GrammarRule
 
 // Replaces the placeholder argument for a previous CODE_JUMP or CODE_JUMP_IF
 // instruction with an offset that jumps to the current end of bytecode.
-static void patchJump(Compiler* compiler, int offset)
+void patchJump(Compiler* compiler, int offset)
 {
     // -2 to adjust for the bytecode for the jump offset itself.
     int jump = compiler.fn.code.count - offset - 2;
@@ -1809,7 +1809,7 @@ static void finishBody(Compiler* compiler)
 
 // The VM can only handle a certain number of parameters, so check that we
 // haven't exceeded that and give a usable error.
-static void validateNumParameters(Compiler* compiler, int numArgs)
+void validateNumParameters(Compiler* compiler, int numArgs)
 {
     if (numArgs == MAX_PARAMETERS + 1)
     {
@@ -1844,8 +1844,8 @@ static int methodSymbol(Compiler* compiler, const char* name, int length)
 
 // Appends characters to [name] (and updates [length]) for [numParams] "_"
 // surrounded by [leftBracket] and [rightBracket].
-static void signatureParameterList(char* name, int* length,
-                                   int numParams, char leftBracket, char rightBracket)
+void signatureParameterList(char* name, int* length,
+                            int numParams, char leftBracket, char rightBracket)
 {
     name[(*length)++] = leftBracket;
 
@@ -1862,8 +1862,8 @@ static void signatureParameterList(char* name, int* length,
 
 // Fills [name] with the stringified version of [signature] and updates
 // [length] to the resulting length.
-static void signatureToString(Signature* signature,
-                              char* name, int* length)
+void signatureToString(Signature* signature,
+                       char* name, int* length)
 {
     import core.stdc.string : memcpy;
     *length = 0;
@@ -1912,7 +1912,7 @@ static void signatureToString(Signature* signature,
 }
 
 // Gets the symbol for a method with [signature].
-static int signatureSymbol(Compiler* compiler, Signature* signature)
+int signatureSymbol(Compiler* compiler, Signature* signature)
 {
     // Build the full name from the signature.
     char[MAX_METHOD_SIGNATURE] name = 0;
@@ -1923,7 +1923,7 @@ static int signatureSymbol(Compiler* compiler, Signature* signature)
 }
 
 // Returns a signature with [type] whose name is from the last consumed token.
-static Signature signatureFromToken(Compiler* compiler, SignatureType type)
+Signature signatureFromToken(Compiler* compiler, SignatureType type)
 {
     Signature signature;
     
@@ -1946,7 +1946,7 @@ static Signature signatureFromToken(Compiler* compiler, SignatureType type)
 
 // Parses a comma-separated list of arguments. Modifies [signature] to include
 // the arity of the argument list.
-static void finishArgumentList(Compiler* compiler, Signature* signature)
+void finishArgumentList(Compiler* compiler, Signature* signature)
 {
     do
     {
@@ -1961,8 +1961,8 @@ static void finishArgumentList(Compiler* compiler, Signature* signature)
 }
 
 // Compiles a method call with [signature] using [instruction].
-static void callSignature(Compiler* compiler, Code instruction,
-                          Signature* signature)
+void callSignature(Compiler* compiler, Code instruction,
+                   Signature* signature)
 {
     int symbol = signatureSymbol(compiler, signature);
     emitShortArg(compiler, cast(Code)(instruction + signature.arity), symbol);
@@ -1982,8 +1982,8 @@ static void callSignature(Compiler* compiler, Code instruction,
 }
 
 // Compiles a method call with [numArgs] for a method with [name] with [length].
-static void callMethod(Compiler* compiler, int numArgs, const char* name,
-                       int length)
+void callMethod(Compiler* compiler, int numArgs, const char* name,
+                int length)
 {
     int symbol = methodSymbol(compiler, name, length);
     emitShortArg(compiler, cast(Code)(Code.CODE_CALL_0 + numArgs), symbol);
@@ -1991,8 +1991,8 @@ static void callMethod(Compiler* compiler, int numArgs, const char* name,
 
 // Compiles an (optional) argument list for a method call with [methodSignature]
 // and then calls it.
-static void methodCall(Compiler* compiler, Code instruction,
-                       Signature* signature)
+void methodCall(Compiler* compiler, Code instruction,
+                Signature* signature)
 {
     import core.stdc.string : memmove;
     // Make a new signature that contains the updated arity and type based on
@@ -2067,7 +2067,7 @@ static void methodCall(Compiler* compiler, Code instruction,
 
 // Compiles a call whose name is the previously consumed token. This includes
 // getters, method calls with arguments, and setter calls.
-static void namedCall(Compiler* compiler, bool canAssign, Code instruction)
+void namedCall(Compiler* compiler, bool canAssign, Code instruction)
 {
   // Get the token for the method name.
   Signature signature = signatureFromToken(compiler, SignatureType.SIG_GETTER);
@@ -2092,7 +2092,7 @@ static void namedCall(Compiler* compiler, bool canAssign, Code instruction)
 }
 
 // Emits the code to load [variable] onto the stack.
-static void loadVariable(Compiler* compiler, Variable variable)
+void loadVariable(Compiler* compiler, Variable variable)
 {
     switch (variable.scope_) with(Scope)
     {
@@ -2112,13 +2112,13 @@ static void loadVariable(Compiler* compiler, Variable variable)
 
 // Loads the receiver of the currently enclosing method. Correctly handles
 // functions defined inside methods.
-static void loadThis(Compiler* compiler)
+void loadThis(Compiler* compiler)
 {
     loadVariable(compiler, resolveNonmodule(compiler, "this", 4));
 }
 
 // Pushes the value for a module-level variable implicitly imported from core.
-static void loadCoreVariable(Compiler* compiler, const(char)* name)
+void loadCoreVariable(Compiler* compiler, const(char)* name)
 {
     import core.stdc.string : strlen;
     int symbol = wrenSymbolTableFind(&compiler.parser.module_.variableNames,
@@ -2130,14 +2130,14 @@ static void loadCoreVariable(Compiler* compiler, const(char)* name)
 }
 
 // A parenthesized expression.
-static void grouping(Compiler* compiler, bool canAssign)
+void grouping(Compiler* compiler, bool canAssign)
 {
     expression(compiler);
     consume(compiler, TokenType.TOKEN_RIGHT_PAREN, "Expect ')' after expression.");
 }
 
 // A list literal.
-static void list(Compiler* compiler, bool canAssign)
+void list(Compiler* compiler, bool canAssign)
 {
     // Instantiate a new list.
     loadCoreVariable(compiler, "List");
@@ -2162,7 +2162,7 @@ static void list(Compiler* compiler, bool canAssign)
 }
 
 // A map literal.
-static void map(Compiler* compiler, bool canAssign)
+void map(Compiler* compiler, bool canAssign)
 {
     // Instantiate a new map.
     loadCoreVariable(compiler, "Map");
@@ -2193,7 +2193,7 @@ static void map(Compiler* compiler, bool canAssign)
 }
 
 // Unary operators like `-foo`.
-static void unaryOp(Compiler* compiler, bool canAssign)
+void unaryOp(Compiler* compiler, bool canAssign)
 {
     GrammarRule* rule = getRule(compiler.parser.previous.type);
 
@@ -2206,7 +2206,7 @@ static void unaryOp(Compiler* compiler, bool canAssign)
     callMethod(compiler, 0, rule.name, 1);
 }
 
-static void boolean(Compiler* compiler, bool canAssign)
+void boolean(Compiler* compiler, bool canAssign)
 {
     emitOp(compiler,
         compiler.parser.previous.type == TokenType.TOKEN_FALSE ? Code.CODE_FALSE : Code.CODE_TRUE);
@@ -2214,7 +2214,7 @@ static void boolean(Compiler* compiler, bool canAssign)
 
 // Walks the compiler chain to find the compiler for the nearest class
 // enclosing this one. Returns NULL if not currently inside a class definition.
-static Compiler* getEnclosingClassCompiler(Compiler* compiler)
+Compiler* getEnclosingClassCompiler(Compiler* compiler)
 {
     while (compiler != null)
     {
@@ -2227,13 +2227,13 @@ static Compiler* getEnclosingClassCompiler(Compiler* compiler)
 
 // Walks the compiler chain to find the nearest class enclosing this one.
 // Returns NULL if not currently inside a class definition.
-static ClassInfo* getEnclosingClass(Compiler* compiler)
+ClassInfo* getEnclosingClass(Compiler* compiler)
 {
     compiler = getEnclosingClassCompiler(compiler);
     return compiler == null ? null : compiler.enclosingClass;
 }
 
-static void field(Compiler* compiler, bool canAssign)
+void field(Compiler* compiler, bool canAssign)
 {
     // Initialize it with a fake value so we can keep parsing and minimize the
     // number of cascaded errors.
@@ -2292,7 +2292,7 @@ static void field(Compiler* compiler, bool canAssign)
 }
 
 // Compiles a read or assignment to [variable].
-static void bareName(Compiler* compiler, bool canAssign, Variable variable)
+void bareName(Compiler* compiler, bool canAssign, Variable variable)
 {
     // If there's an "=" after a bare name, it's a variable assignment.
     if (canAssign && match(compiler, TokenType.TOKEN_EQ))
@@ -2325,7 +2325,7 @@ static void bareName(Compiler* compiler, bool canAssign, Variable variable)
     allowLineBeforeDot(compiler);
 }
 
-static void staticField(Compiler* compiler, bool canAssign)
+void staticField(Compiler* compiler, bool canAssign)
 {
     Compiler* classCompiler = getEnclosingClassCompiler(compiler);
     if (classCompiler == null)
@@ -2356,7 +2356,7 @@ static void staticField(Compiler* compiler, bool canAssign)
 }
 
 // Compiles a variable name or method call with an implicit receiver.
-static void name(Compiler* compiler, bool canAssign)
+void name(Compiler* compiler, bool canAssign)
 {
     // Look for the name in the scope chain up to the nearest enclosing method.
     Token* token = &compiler.parser.previous;
@@ -2407,13 +2407,13 @@ static void name(Compiler* compiler, bool canAssign)
     bareName(compiler, canAssign, variable);
 }
 
-static void null_(Compiler* compiler, bool canAssign)
+void null_(Compiler* compiler, bool canAssign)
 {
     emitOp(compiler, Code.CODE_NULL);
 }
 
 // A number or string literal.
-static void literal(Compiler* compiler, bool canAssign)
+void literal(Compiler* compiler, bool canAssign)
 {
     emitConstant(compiler, compiler.parser.previous.value);
 }
@@ -2428,7 +2428,7 @@ static void literal(Compiler* compiler, bool canAssign)
 // is compiled roughly like:
 //
 //     ["a ", b + c, " d"].join()
-static void stringInterpolation(Compiler* compiler, bool canAssign)
+void stringInterpolation(Compiler* compiler, bool canAssign)
 {
     // Instantiate a new list.
     loadCoreVariable(compiler, "List");
@@ -2457,7 +2457,7 @@ static void stringInterpolation(Compiler* compiler, bool canAssign)
     callMethod(compiler, 0, "join()", 6);
 }
 
-static void super_(Compiler* compiler, bool canAssign)
+void super_(Compiler* compiler, bool canAssign)
 {
     ClassInfo* enclosingClass = getEnclosingClass(compiler);
     if (enclosingClass == null)
@@ -2487,7 +2487,7 @@ static void super_(Compiler* compiler, bool canAssign)
     }
 }
 
-static void this_(Compiler* compiler, bool canAssign)
+void this_(Compiler* compiler, bool canAssign)
 {
     if (getEnclosingClass(compiler) == null)
     {
@@ -2499,7 +2499,7 @@ static void this_(Compiler* compiler, bool canAssign)
 }
 
 // Subscript or "array indexing" operator like `foo[bar]`.
-static void subscript(Compiler* compiler, bool canAssign)
+void subscript(Compiler* compiler, bool canAssign)
 {
     Signature signature = { "", 0, SignatureType.SIG_SUBSCRIPT, 0 };
 
@@ -2521,14 +2521,14 @@ static void subscript(Compiler* compiler, bool canAssign)
     callSignature(compiler, Code.CODE_CALL_0, &signature);
 }
 
-static void call(Compiler* compiler, bool canAssign)
+void call(Compiler* compiler, bool canAssign)
 {
     ignoreNewlines(compiler);
     consume(compiler, TokenType.TOKEN_NAME, "Expect method name after '.'.");
     namedCall(compiler, canAssign, Code.CODE_CALL_0);
 }
 
-static void and_(Compiler* compiler, bool canAssign)
+void and_(Compiler* compiler, bool canAssign)
 {
     ignoreNewlines(compiler);
 
@@ -2538,7 +2538,7 @@ static void and_(Compiler* compiler, bool canAssign)
     patchJump(compiler, jump);
 }
 
-static void or_(Compiler* compiler, bool canAssign)
+void or_(Compiler* compiler, bool canAssign)
 {
     ignoreNewlines(compiler);
 
@@ -2548,7 +2548,7 @@ static void or_(Compiler* compiler, bool canAssign)
     patchJump(compiler, jump);
 }
 
-static void conditional(Compiler* compiler, bool canAssign)
+void conditional(Compiler* compiler, bool canAssign)
 {
     // Ignore newline after '?'.
     ignoreNewlines(compiler);
@@ -2633,7 +2633,7 @@ void mixedSignature(Compiler* compiler, Signature* signature)
 // Compiles an optional setter parameter in a method [signature].
 //
 // Returns `true` if it was a setter.
-static bool maybeSetter(Compiler* compiler, Signature* signature)
+bool maybeSetter(Compiler* compiler, Signature* signature)
 {
     // See if it's a setter.
     if (!match(compiler, TokenType.TOKEN_EQ)) return false;
@@ -2676,7 +2676,7 @@ void subscriptSignature(Compiler* compiler, Signature* signature)
 
 // Parses an optional parenthesized parameter list. Updates `type` and `arity`
 // in [signature] to match what was parsed.
-static void parameterList(Compiler* compiler, Signature* signature)
+void parameterList(Compiler* compiler, Signature* signature)
 {
     // The parameter list is optional.
     if (!match(compiler, TokenType.TOKEN_LEFT_PAREN)) return;
@@ -2806,7 +2806,7 @@ static immutable GrammarRule[] rules = [
 ];
 
 // Gets the [GrammarRule] associated with tokens of [type].
-static GrammarRule* getRule(TokenType type)
+GrammarRule* getRule(TokenType type)
 {
     return cast(typeof(return))&rules[type];
 }
@@ -2850,8 +2850,7 @@ void expression(Compiler* compiler)
 
 // Returns the number of bytes for the arguments to the instruction 
 // at [ip] in [fn]'s bytecode.
-static int getByteCountForArguments(const ubyte* bytecode,
-                            const Value* constants, int ip)
+int getByteCountForArguments(const ubyte* bytecode, const Value* constants, int ip)
 {
     Code instruction = cast(Code)bytecode[ip];
     switch (instruction) with(Code)
@@ -2956,7 +2955,7 @@ static int getByteCountForArguments(const ubyte* bytecode,
 
 // Marks the beginning of a loop. Keeps track of the current instruction so we
 // know what to loop back to at the end of the body.
-static void startLoop(Compiler* compiler, Loop* loop)
+void startLoop(Compiler* compiler, Loop* loop)
 {
     loop.enclosing = compiler.loop;
     loop.start = compiler.fn.code.count - 1;
@@ -2967,14 +2966,14 @@ static void startLoop(Compiler* compiler, Loop* loop)
 // Emits the [CODE_JUMP_IF] instruction used to test the loop condition and
 // potentially exit the loop. Keeps track of the instruction so we can patch it
 // later once we know where the end of the body is.
-static void testExitLoop(Compiler* compiler)
+void testExitLoop(Compiler* compiler)
 {
     compiler.loop.exitJump = emitJump(compiler, Code.CODE_JUMP_IF);
 }
 
 // Compiles the body of the loop and tracks its extent so that contained "break"
 // statements can be handled correctly.
-static void loopBody(Compiler* compiler)
+void loopBody(Compiler* compiler)
 {
     compiler.loop.body_ = compiler.fn.code.count;
     statement(compiler);
@@ -2982,7 +2981,7 @@ static void loopBody(Compiler* compiler)
 
 // Ends the current innermost loop. Patches up all jumps and breaks now that
 // we know where the end of the loop is.
-static void endLoop(Compiler* compiler)
+void endLoop(Compiler* compiler)
 {
     // We don't check for overflow here since the forward jump over the loop body
     // will report an error for the same problem.
@@ -3013,7 +3012,7 @@ static void endLoop(Compiler* compiler)
     compiler.loop = compiler.loop.enclosing;
 }
 
-static void forStatement(Compiler* compiler)
+void forStatement(Compiler* compiler)
 {
     // A for statement like:
     //
@@ -3111,7 +3110,7 @@ static void forStatement(Compiler* compiler)
     popScope(compiler);
 }
 
-static void ifStatement(Compiler* compiler)
+void ifStatement(Compiler* compiler)
 {
     // Compile the condition.
     consume(compiler, TokenType.TOKEN_LEFT_PAREN, "Expect '(' after 'if'.");
@@ -3142,7 +3141,7 @@ static void ifStatement(Compiler* compiler)
     }
 }
 
-static void whileStatement(Compiler* compiler)
+void whileStatement(Compiler* compiler)
 {
     Loop loop;
     startLoop(compiler, &loop);
@@ -3267,8 +3266,7 @@ void statement(Compiler* compiler)
 //     CODE_CALL      - Invoke the initializer on the new instance.
 //
 // This creates that method and calls the initializer with [initializerSymbol].
-static void createConstructor(Compiler* compiler, Signature* signature,
-                              int initializerSymbol)
+void createConstructor(Compiler* compiler, Signature* signature, int initializerSymbol)
 {
     Compiler methodCompiler;
     initCompiler(&methodCompiler, compiler.parser, compiler, true);
@@ -3289,8 +3287,7 @@ static void createConstructor(Compiler* compiler, Signature* signature,
 
 // Loads the enclosing class onto the stack and then binds the function already
 // on the stack as a method on that class.
-static void defineMethod(Compiler* compiler, Variable classVariable,
-                         bool isStatic, int methodSymbol)
+void defineMethod(Compiler* compiler, Variable classVariable, bool isStatic, int methodSymbol)
 {
     // Load the class. We have to do this for each method because we can't
     // keep the class on top of the stack. If there are static fields, they
@@ -3308,8 +3305,7 @@ static void defineMethod(Compiler* compiler, Variable classVariable,
 //
 // Reports an error if a method with that signature is already declared.
 // Returns the symbol for the method.
-static int declareMethod(Compiler* compiler, Signature* signature,
-                         const(char)* name, int length)
+int declareMethod(Compiler* compiler, Signature* signature, const(char)* name, int length)
 {
     int symbol = signatureSymbol(compiler, signature);
     
@@ -3332,7 +3328,7 @@ static int declareMethod(Compiler* compiler, Signature* signature,
     return symbol;
 }
 
-static Value consumeLiteral(Compiler* compiler, const char* message) 
+Value consumeLiteral(Compiler* compiler, const char* message) 
 {
     if(match(compiler, TokenType.TOKEN_FALSE))  return FALSE_VAL;
     if(match(compiler, TokenType.TOKEN_TRUE))   return TRUE_VAL;
@@ -3345,7 +3341,7 @@ static Value consumeLiteral(Compiler* compiler, const char* message)
     return NULL_VAL;
 }
 
-static bool matchAttribute(Compiler* compiler) {
+bool matchAttribute(Compiler* compiler) {
 
     if(match(compiler, TokenType.TOKEN_HASH)) 
     {
@@ -3413,7 +3409,7 @@ static bool matchAttribute(Compiler* compiler) {
 //
 // Returns `true` if it compiled successfully, or `false` if the method couldn't
 // be parsed.
-static bool method(Compiler* compiler, Variable classVariable)
+bool method(Compiler* compiler, Variable classVariable)
 {
     // Parse any attributes before the method and store them
     if(matchAttribute(compiler)) {
@@ -3500,7 +3496,7 @@ static bool method(Compiler* compiler, Variable classVariable)
 
 // Compiles a class definition. Assumes the "class" token has already been
 // consumed (along with a possibly preceding "foreign" token).
-static void classDefinition(Compiler* compiler, bool isForeign)
+void classDefinition(Compiler* compiler, bool isForeign)
 {
     // Create a variable to store the class in.
     Variable classVariable;
@@ -3629,7 +3625,7 @@ static void classDefinition(Compiler* compiler, bool isForeign)
 // * Emit an IMPORT_VARIABLE instruction to load the variable's value from the
 //   other module.
 // * Compile the code to store that value in the variable in this scope.
-static void import_(Compiler* compiler)
+void import_(Compiler* compiler)
 {
     ignoreNewlines(compiler);
     consume(compiler, TokenType.TOKEN_STRING, "Expect a string after 'import'.");
@@ -3686,7 +3682,7 @@ static void import_(Compiler* compiler)
 }
 
 // Compiles a "var" variable definition statement.
-static void variableDefinition(Compiler* compiler)
+void variableDefinition(Compiler* compiler)
 {
     // Grab its name, but don't declare it yet. A (local) variable shouldn't be
     // in scope in its own initializer.
@@ -3928,7 +3924,7 @@ void wrenMarkCompiler(WrenVM* vm, Compiler* compiler)
 
 // Throw an error if any attributes were found preceding, 
 // and clear the attributes so the error doesn't keep happening.
-static void disallowAttributes(Compiler* compiler)
+void disallowAttributes(Compiler* compiler)
 {
     if (compiler.numAttributes > 0)
     {
@@ -3938,8 +3934,7 @@ static void disallowAttributes(Compiler* compiler)
     }
 }
 // Add an attribute to a given group in the compiler attribues map
-static void addToAttributeGroup(Compiler* compiler, 
-                                Value group, Value key, Value value) 
+void addToAttributeGroup(Compiler* compiler, Value group, Value key, Value value) 
 {
     WrenVM* vm = compiler.parser.vm;
 
@@ -3978,7 +3973,7 @@ static void addToAttributeGroup(Compiler* compiler,
 
 
 // Emit the attributes in the give map onto the stack
-static void emitAttributes(Compiler* compiler, ObjMap* attributes) 
+void emitAttributes(Compiler* compiler, ObjMap* attributes) 
 {
     // Instantiate a new map for the attributes
     loadCoreVariable(compiler, "Map");
@@ -4026,7 +4021,7 @@ static void emitAttributes(Compiler* compiler, ObjMap* attributes)
 
 // Methods are stored as method <. attributes, so we have to have 
 // an indirection to resolve for methods
-static void emitAttributeMethods(Compiler* compiler, ObjMap* attributes)
+void emitAttributeMethods(Compiler* compiler, ObjMap* attributes)
 {
     // Instantiate a new map for the attributes
     loadCoreVariable(compiler, "Map");
@@ -4045,7 +4040,7 @@ static void emitAttributeMethods(Compiler* compiler, ObjMap* attributes)
 
 
 // Emit the final ClassAttributes that exists at runtime
-static void emitClassAttributes(Compiler* compiler, ClassInfo* classInfo)
+void emitClassAttributes(Compiler* compiler, ClassInfo* classInfo)
 {
     loadCoreVariable(compiler, "ClassAttributes");
 
@@ -4062,7 +4057,7 @@ static void emitClassAttributes(Compiler* compiler, ClassInfo* classInfo)
 
 // Copy the current attributes stored in the compiler into a destination map
 // This also resets the counter, since the intent is to consume the attributes
-static void copyAttributes(Compiler* compiler, ObjMap* into)
+void copyAttributes(Compiler* compiler, ObjMap* into)
 {
     compiler.numAttributes = 0;
 
@@ -4086,8 +4081,7 @@ static void copyAttributes(Compiler* compiler, ObjMap* into)
 // Copy the current attributes stored in the compiler into the method specific
 // attributes for the current enclosingClass.
 // This also resets the counter, since the intent is to consume the attributes
-static void copyMethodAttributes(Compiler* compiler, bool isForeign,
-            bool isStatic, const char* fullSignature, int length) 
+void copyMethodAttributes(Compiler* compiler, bool isForeign, bool isStatic, const char* fullSignature, int length) 
 {
     import core.stdc.stdio : sprintf;
     compiler.numAttributes = 0;

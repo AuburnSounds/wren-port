@@ -1,6 +1,9 @@
 module wren.optional.meta;
 import wren.value;
 import wren.vm;
+import wren.common;
+
+static if (WREN_OPT_META):
 
 private static const(char)[] metaModuleSource = import("optional/wren_opt_meta.wren");
 

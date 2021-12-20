@@ -147,8 +147,7 @@ bool fiber_yield1(WrenVM* vm, Value* args) @nogc
 //
 // [hasValue] is true if a value in [args] is being passed to the new fiber.
 // Otherwise, `null` is implicitly being passed.
-static bool runFiber(WrenVM* vm, ObjFiber* fiber, Value* args, bool isCall,
-                     bool hasValue, const(char)* verb) @nogc
+bool runFiber(WrenVM* vm, ObjFiber* fiber, Value* args, bool isCall, bool hasValue, const(char)* verb) @nogc
 {
     if (wrenHasError(fiber))
     {
@@ -282,7 +281,7 @@ bool fn_arity(WrenVM* vm, Value* args) @nogc
     return RETURN_NUM(args, AS_CLOSURE(args[0]).fn.arity);
 }
 
-static void call_fn(WrenVM* vm, Value* args, int numArgs) @nogc
+void call_fn(WrenVM* vm, Value* args, int numArgs) @nogc
 {
     // +1 to include the function itself.
     wrenCallFunction(vm, vm.fiber, AS_CLOSURE(args[0]), numArgs + 1);
@@ -1453,7 +1452,7 @@ bool system_writeString(WrenVM* vm, Value* args) @nogc
 }
 
 // Creates either the Object or Class class in the core module with [name].
-static ObjClass* defineClass(WrenVM* vm, ObjModule* module_, const(char)* name) @nogc
+ObjClass* defineClass(WrenVM* vm, ObjModule* module_, const(char)* name) @nogc
 {
   ObjString* nameString = AS_STRING(wrenNewString(vm, name));
   wrenPushRoot(vm, cast(Obj*)nameString);

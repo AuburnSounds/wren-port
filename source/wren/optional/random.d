@@ -1,5 +1,8 @@
 module wren.optional.random;
 import wren.vm;
+import wren.common;
+
+static if (WREN_OPT_RANDOM):
 
 private static const(char)[] randomModuleSource = import("optional/wren_opt_random.wren");
 
@@ -13,7 +16,7 @@ struct Well512
 }
 
 // Code from: http://www.lomont.org/Math/Papers/2008/Lomont_PRNG_2008.pdf
-static uint advanceState(Well512* well) @nogc
+uint advanceState(Well512* well) @nogc
 {
     uint a, b, c, d;
     a = well.state[well.index];
@@ -30,13 +33,13 @@ static uint advanceState(Well512* well) @nogc
     return well.state[well.index];
 }
 
-static void randomAllocate(WrenVM* vm) @nogc
+void randomAllocate(WrenVM* vm) @nogc
 {
     Well512* well = cast(Well512*)wrenSetSlotNewForeign(vm, 0, 0, Well512.sizeof);
     well.index = 0;
 }
 
-static void randomSeed0(WrenVM* vm) @nogc
+void randomSeed0(WrenVM* vm) @nogc
 {
     import core.stdc.stdlib : srand, rand;
     import core.stdc.time : time;
@@ -50,7 +53,7 @@ static void randomSeed0(WrenVM* vm) @nogc
     }
 }
 
-static void randomSeed1(WrenVM* vm) @nogc
+void randomSeed1(WrenVM* vm) @nogc
 {
     import core.stdc.stdlib : srand, rand;
     Well512* well = cast(Well512*)wrenGetSlotForeign(vm, 0);
@@ -62,7 +65,7 @@ static void randomSeed1(WrenVM* vm) @nogc
     }
 }
 
-static void randomSeed16(WrenVM* vm) @nogc
+void randomSeed16(WrenVM* vm) @nogc
 {
     Well512* well = cast(Well512*)wrenGetSlotForeign(vm, 0);
 
@@ -72,7 +75,7 @@ static void randomSeed16(WrenVM* vm) @nogc
     }
 }
 
-static void randomFloat(WrenVM* vm) @nogc
+void randomFloat(WrenVM* vm) @nogc
 {
     Well512* well = cast(Well512*)wrenGetSlotForeign(vm, 0);
 
@@ -92,7 +95,7 @@ static void randomFloat(WrenVM* vm) @nogc
     wrenSetSlotDouble(vm, 0, result);
 }
 
-static void randomInt0(WrenVM* vm) @nogc
+void randomInt0(WrenVM* vm) @nogc
 {
     Well512* well = cast(Well512*)wrenGetSlotForeign(vm, 0);
 

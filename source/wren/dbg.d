@@ -47,7 +47,7 @@ void wrenDebugPrintStackTrace(WrenVM* vm)
     }
 }
 
-static void dumpObject(Obj* obj)
+void dumpObject(Obj* obj)
 {
     switch (obj.type) with(ObjType)
     {
@@ -111,7 +111,7 @@ void wrenDumpValue(Value value)
 
 }
 
-static int dumpInstruction(WrenVM* vm, ObjFn* fn, int i, int* lastLine)
+int dumpInstruction(WrenVM* vm, ObjFn* fn, int i, int* lastLine)
 {
     int start = i;
     ubyte* bytecode = fn.code.data;
@@ -137,10 +137,6 @@ static int dumpInstruction(WrenVM* vm, ObjFn* fn, int i, int* lastLine)
     ushort READ_SHORT() {
         i += 2;
         return (bytecode[i - 2] << 8 | bytecode[i - 1]);
-    }
-
-    auto BYTE_INSTRUCTION(const(char)[] instr) {
-        return "printf(\"%-16s %5d\n\", \"" ~ instr ~ "\".ptr, READ_BYTE()); break;";
     }
 
     switch (code) with (Code)
@@ -169,11 +165,12 @@ static int dumpInstruction(WrenVM* vm, ObjFn* fn, int i, int* lastLine)
         case CODE_LOAD_LOCAL_8: printf("LOAD_LOCAL_8\n"); break;
 
         case CODE_LOAD_LOCAL: {
-            mixin (BYTE_INSTRUCTION("LOAD_LOCAL"));
+            printf("%-16s %5d\n", "LOAD_LOCAL".ptr, READ_BYTE()); break;
         }
-        case CODE_STORE_LOCAL: mixin (BYTE_INSTRUCTION("STORE_LOCAL"));
-        case CODE_LOAD_UPVALUE: mixin (BYTE_INSTRUCTION("LOAD_UPVALUE"));
-        case CODE_STORE_UPVALUE: mixin (BYTE_INSTRUCTION("STORE_UPVALUE"));
+
+        case CODE_STORE_LOCAL: printf("%-16s %5d\n", "STORE_LOCAL".ptr, READ_BYTE()); break;
+        case CODE_LOAD_UPVALUE: printf("%-16s %5d\n", "LOAD_UPVALUE".ptr, READ_BYTE()); break;
+        case CODE_STORE_UPVALUE: printf("%-16s %5d\n", "STORE_UPVALUE".ptr, READ_BYTE()); break;
 
         case CODE_LOAD_MODULE_VAR:
         {
@@ -189,12 +186,12 @@ static int dumpInstruction(WrenVM* vm, ObjFn* fn, int i, int* lastLine)
             printf("%-16s %5d '%s'\n", "STORE_MODULE_VAR".ptr, slot,
                     fn.module_.variableNames.data[slot].value.ptr);
             break;
-        }
+        }            
 
-        case CODE_LOAD_FIELD_THIS: mixin (BYTE_INSTRUCTION("LOAD_FIELD_THIS"));
-        case CODE_STORE_FIELD_THIS: mixin (BYTE_INSTRUCTION("STORE_FIELD_THIS"));
-        case CODE_LOAD_FIELD: mixin (BYTE_INSTRUCTION("LOAD_FIELD"));
-        case CODE_STORE_FIELD: mixin (BYTE_INSTRUCTION("STORE_FIELD"));
+        case CODE_LOAD_FIELD_THIS: printf("%-16s %5d\n", "LOAD_FIELD_THIS".ptr, READ_BYTE()); break;       
+        case CODE_STORE_FIELD_THIS:  printf("%-16s %5d\n", "STORE_FIELD_THIS".ptr, READ_BYTE()); break;        
+        case CODE_LOAD_FIELD: printf("%-16s %5d\n", "LOAD_FIELD".ptr, READ_BYTE()); break;        
+        case CODE_STORE_FIELD: printf("%-16s %5d\n", "STORE_FIELD".ptr, READ_BYTE()); break;
 
         case CODE_POP: printf("POP\n"); break;
 

@@ -358,7 +358,7 @@ struct WrenVM
 // may return a non-null pointer which must not be dereferenced but nevertheless
 // should be freed. To prevent that, we avoid calling realloc() with a zero
 // size.
-static void* defaultReallocate(void* ptr, size_t newSize, void* _)
+void* defaultReallocate(void* ptr, size_t newSize, void* _)
 {
     import core.stdc.stdlib : free, realloc;
 
@@ -595,7 +595,7 @@ void* wrenReallocate(WrenVM* vm, void* memory, size_t oldSize, size_t newSize)
 // ensure that multiple closures closing over the same variable actually see
 // the same variable.) Otherwise, it will create a new open upvalue and add it
 // the fiber's list of upvalues.
-static ObjUpvalue* captureUpvalue(WrenVM* vm, ObjFiber* fiber, Value* local)
+ObjUpvalue* captureUpvalue(WrenVM* vm, ObjFiber* fiber, Value* local)
 {
     // If there are no open upvalues at all, we must need a new one.
     if (fiber.openUpvalues == null)
@@ -638,7 +638,7 @@ static ObjUpvalue* captureUpvalue(WrenVM* vm, ObjFiber* fiber, Value* local)
 
 // Closes any open upvalues that have been created for stack slots at [last]
 // and above.
-static void closeUpvalues(ObjFiber* fiber, Value* last)
+void closeUpvalues(ObjFiber* fiber, Value* last)
 {
     while (fiber.openUpvalues != null &&
             fiber.openUpvalues.value >= last)
@@ -658,11 +658,11 @@ static void closeUpvalues(ObjFiber* fiber, Value* last)
 //
 // This will try the host's foreign method binder first. If that fails, it
 // falls back to handling the built-in modules.
-static WrenForeignMethodFn findForeignMethod(WrenVM* vm,
-                                             const char* moduleName,
-                                             const char* className,
-                                             bool isStatic,
-                                             const char* signature)
+WrenForeignMethodFn findForeignMethod(WrenVM* vm,
+                                      const char* moduleName,
+                                      const char* className,
+                                      bool isStatic,
+                                      const char* signature)
 {
     WrenForeignMethodFn method = null;
     
@@ -702,8 +702,7 @@ static WrenForeignMethodFn findForeignMethod(WrenVM* vm,
 //
 // Aborts the current fiber if the method is a foreign method that could not be
 // found.
-static void bindMethod(WrenVM* vm, int methodType, int symbol,
-                       ObjModule* module_, ObjClass* classObj, Value methodValue)
+void bindMethod(WrenVM* vm, int methodType, int symbol, ObjModule* module_, ObjClass* classObj, Value methodValue)
 {
     const(char)* className = classObj.name.value.ptr;
     if (methodType == Code.CODE_METHOD_STATIC) classObj = classObj.obj.classObj;
@@ -740,8 +739,7 @@ static void bindMethod(WrenVM* vm, int methodType, int symbol,
     wrenBindMethod(vm, classObj, symbol, method);
 }
 
-static void callForeign(WrenVM* vm, ObjFiber* fiber,
-                        WrenForeignMethodFn foreign, int numArgs)
+void callForeign(WrenVM* vm, ObjFiber* fiber, WrenForeignMethodFn foreign, int numArgs)
 {
     assert(vm.apiStack == null, "Cannot already be in foreign call.");
     vm.apiStack = fiber.stackTop - numArgs;
@@ -759,7 +757,7 @@ static void callForeign(WrenVM* vm, ObjFiber* fiber,
 //
 // Walks the call chain of fibers, aborting each one until it hits a fiber that
 // handles the error. If none do, tells the VM to stop.
-static void runtimeError(WrenVM* vm)
+void runtimeError(WrenVM* vm)
 {
     assert(wrenHasError(vm.fiber), "Should only call this after an error.");
 
@@ -795,7 +793,7 @@ static void runtimeError(WrenVM* vm)
 
 // Aborts the current fiber with an appropriate method not found error for a
 // method with [symbol] on [classObj].
-static void methodNotFound(WrenVM* vm, ObjClass* classObj, int symbol)
+void methodNotFound(WrenVM* vm, ObjClass* classObj, int symbol)
 {
     vm.fiber.error = wrenStringFormat(vm, "@ does not implement '$'.".ptr,
         OBJ_VAL(classObj.name), vm.methodNames.data[symbol].value.ptr);
@@ -804,14 +802,13 @@ static void methodNotFound(WrenVM* vm, ObjClass* classObj, int symbol)
 // Looks up the previously loaded module with [name].
 //
 // Returns `null` if no module with that name has been loaded.
-static ObjModule* getModule(WrenVM* vm, Value name)
+ObjModule* getModule(WrenVM* vm, Value name)
 {
     Value moduleValue = wrenMapGet(vm.modules, name);
     return !IS_UNDEFINED(moduleValue) ? AS_MODULE(moduleValue) : null;
 }
 
-static ObjClosure* compileInModule(WrenVM* vm, Value name, const char* source,
-                                   bool isExpression, bool printErrors)
+ObjClosure* compileInModule(WrenVM* vm, Value name, const char* source, bool isExpression, bool printErrors)
 {
     // See if the module has already been loaded.
     ObjModule* module_ = getModule(vm, name);
@@ -865,8 +862,7 @@ static ObjClosure* compileInModule(WrenVM* vm, Value name, const char* source,
 //
 // If successful, returns `null`. Otherwise, returns a string for the runtime
 // error message.
-static Value validateSuperclass(WrenVM* vm, Value name, Value superclassValue,
-                                int numFields)
+Value validateSuperclass(WrenVM* vm, Value name, Value superclassValue, int numFields)
 {
   // Make sure the superclass is a class.
   if (!IS_CLASS(superclassValue))
@@ -920,7 +916,7 @@ static Value validateSuperclass(WrenVM* vm, Value name, Value superclassValue,
   return NULL_VAL;
 }
 
-static void bindForeignClass(WrenVM* vm, ObjClass* classObj, ObjModule* module_)
+void bindForeignClass(WrenVM* vm, ObjClass* classObj, ObjModule* module_)
 {
     WrenForeignClassMethods methods;
     methods.allocate = null;
@@ -978,7 +974,7 @@ static void bindForeignClass(WrenVM* vm, ObjClass* classObj, ObjModule* module_)
 // This process handles moving the attribute data for a class from
 // compile time to runtime, since it now has all the attributes associated
 // with a class, including for methods.
-static void endClass(WrenVM* vm) 
+void endClass(WrenVM* vm) 
 {
   // Pull the attributes and class off the stack
   Value attributes = vm.fiber.stackTop[-2];
@@ -998,7 +994,7 @@ static void endClass(WrenVM* vm)
 // stack will contain the new class.
 //
 // Aborts the current fiber if an error occurs.
-static void createClass(WrenVM* vm, int numFields, ObjModule* module_)
+void createClass(WrenVM* vm, int numFields, ObjModule* module_)
 {
     // Pull the name and superclass off the stack.
     Value name = vm.fiber.stackTop[-2];
@@ -1018,7 +1014,7 @@ static void createClass(WrenVM* vm, int numFields, ObjModule* module_)
     if (numFields == -1) bindForeignClass(vm, classObj, module_);
 }
 
-static void createForeign(WrenVM* vm, ObjFiber* fiber, Value* stack)
+void createForeign(WrenVM* vm, ObjFiber* fiber, Value* stack)
 {
     ObjClass* classObj = AS_CLASS(stack[0]);
     assert(classObj.numFields == -1, "Class must be a foreign class.");
@@ -1063,7 +1059,7 @@ void wrenFinalizeForeign(WrenVM* vm, ObjForeign* foreign)
 }
 
 // Let the host resolve an imported module name if it wants to.
-static Value resolveModule(WrenVM* vm, Value name)
+Value resolveModule(WrenVM* vm, Value name)
 {
     // If the host doesn't care to resolve, leave the name alone.
     if (vm.config.resolveModuleFn == null) return name;
@@ -1091,7 +1087,7 @@ static Value resolveModule(WrenVM* vm, Value name)
     return name;
 }
 
-static Value importModule(WrenVM* vm, Value name)
+Value importModule(WrenVM* vm, Value name)
 {
     name = resolveModule(vm, name);
     
@@ -1152,8 +1148,7 @@ static Value importModule(WrenVM* vm, Value name)
     return OBJ_VAL(moduleClosure);
 }
 
-static Value getModuleVariable(WrenVM* vm, ObjModule* module_,
-                               Value variableName)
+Value getModuleVariable(WrenVM* vm, ObjModule* module_, Value variableName)
 {
     ObjString* variable = AS_STRING(variableName);
     uint variableEntry = wrenSymbolTableFind(&module_.variableNames,
@@ -1172,7 +1167,7 @@ static Value getModuleVariable(WrenVM* vm, ObjModule* module_,
     return NULL_VAL;
 }
 
-static bool checkArity(WrenVM* vm, Value value, int numArgs)
+bool checkArity(WrenVM* vm, Value value, int numArgs)
 {
     assert(IS_CLOSURE(value), "Receiver must be a closure.");
     ObjFn* fn = AS_CLOSURE(value).fn;
@@ -1189,7 +1184,7 @@ static bool checkArity(WrenVM* vm, Value value, int numArgs)
 // The main bytecode interpreter loop. This is where the magic happens. It is
 // also, as you can imagine, highly performance critical.
 // Arg... thar be dragons here.
-static WrenInterpretResult runInterpreter(WrenVM* vm, ObjFiber* fiber)
+WrenInterpretResult runInterpreter(WrenVM* vm, ObjFiber* fiber)
 {
     // Remember the current fiber so we can find it if a GC happens.
     vm.fiber = fiber;
@@ -2005,8 +2000,7 @@ int wrenDefineVariable(WrenVM* vm, ObjModule* module_, const char* name,
     return symbol;
 }
 
-static void wrenCallFunction(WrenVM* vm, ObjFiber* fiber,
-                                    ObjClosure* closure, int numArgs)
+void wrenCallFunction(WrenVM* vm, ObjFiber* fiber, ObjClosure* closure, int numArgs)
 {
     // Grow the call frame array if needed.
     if (fiber.numFrames + 1 > fiber.frameCapacity)
@@ -2050,7 +2044,7 @@ ObjClass* wrenGetClass(WrenVM* vm, Value value)
 // Defined here instead of in wren_value.h because it's critical that this be
 // inlined. That means it must be defined in the header, but the wren_value.h
 // header doesn't have a full definitely of WrenVM yet.
-static ObjClass* wrenGetClassInline(WrenVM* vm, Value value)
+ObjClass* wrenGetClassInline(WrenVM* vm, Value value)
 {
     if (IS_NUM(value)) return vm.numClass;
     if (IS_OBJ(value)) return AS_OBJ(value).classObj;
@@ -2106,7 +2100,7 @@ void wrenEnsureSlots(WrenVM* vm, int numSlots)
 }
 
 // Ensures that [slot] is a valid index into the API's stack of slots.
-static void validateApiSlot(WrenVM* vm, int slot)
+void validateApiSlot(WrenVM* vm, int slot)
 {
     assert(slot >= 0, "Slot cannot be negative.");
     assert(slot < wrenGetSlotCount(vm), "Not that many slots.");
@@ -2177,7 +2171,7 @@ WrenHandle* wrenGetSlotHandle(WrenVM* vm, int slot)
 }
 
 // Stores [value] in [slot] in the foreign call stack.
-static void setSlot(WrenVM* vm, int slot, Value value)
+void setSlot(WrenVM* vm, int slot, Value value)
 {
     validateApiSlot(vm, slot);
     vm.apiStack[slot] = value;
@@ -2453,12 +2447,12 @@ void wrenSetUserData(WrenVM* vm, void* userData)
 	vm.config.userData = userData;
 }
 
-static bool wrenIsLocalName(const(char)* name)
+bool wrenIsLocalName(const(char)* name)
 {
     return name[0] >= 'a' && name[0] <= 'z';
 }
 
-static bool wrenIsFalsyValue(Value value)
+bool wrenIsFalsyValue(Value value)
 {
   return IS_FALSE(value) || IS_NULL(value);
 }

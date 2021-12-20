@@ -39,26 +39,6 @@ else
     enum WREN_NAN_TAGGING = 1;
 }
 
-// Wren's "computed goto" functionality depends on a non-standard GCC extension,
-// which allows you to take the pointer of labels defined within a loop. D, from what I know,
-// does not support this, so we disable this functionality.
-/*
-// If true, the VM's interpreter loop uses computed gotos. See this for more:
-// http://gcc.gnu.org/onlinedocs/gcc-3.1.1/gcc/Labels-as-Values.html
-// Enabling this speeds up the main dispatch loop a bit, but requires compiler
-// support.
-// see https://bullno1.com/blog/switched-goto for alternative
-// Defaults to true on supported compilers.
-version(WrenNoComputedGoto)
-{
-    enum WREN_COMPUTED_GOTO = 0;
-}
-else
-{
-    enum WREN_COMPUTED_GOTO = 1;
-}
-*/
-
 // The VM includes a number of optional modules. You can choose to include
 // these or not. By default, they are all available. To disable one, set the
 // corresponding `WREN_OPT_<name>` define to `0`.
