@@ -1866,7 +1866,7 @@ WrenHandle* wrenMakeHandle(WrenVM* vm, Value value)
     if (IS_OBJ(value)) wrenPushRoot(vm, AS_OBJ(value));
     
     // Make a handle for it.
-    WrenHandle* handle = ALLOCATE!(WrenVM, WrenHandle)(vm);
+    WrenHandle* handle = ALLOCATE!(WrenHandle)(vm);
     handle.value = value;
 
     if (IS_OBJ(value)) wrenPopRoot(vm);
@@ -2456,3 +2456,49 @@ bool wrenIsFalsyValue(Value value)
 {
   return IS_FALSE(value) || IS_NULL(value);
 }
+
+// XXX: move this to `wren.vm`?
+// Use the VM's allocator to allocate an object of [type].
+T* ALLOCATE(T)(WrenVM* vm) @nogc
+{
+    import wren.vm : wrenReallocate;
+    return cast(typeof(return))wrenReallocate(vm, null, 0, T.sizeof);
+}
+
+// Use the VM's allocator to allocate an object of [mainType] containing a
+// flexible array of [count] objects of [arrayType].
+T* ALLOCATE_FLEX(T, ArrayType)(WrenVM* vm, size_t count) @nogc
+{
+    import std.traits : isArray;
+    import wren.vm : wrenReallocate;
+    T* obj = cast(T*)wrenReallocate(vm, null, 0, T.sizeof);
+    ArrayType* arr = cast(ArrayType*)wrenReallocate(vm, null, 0, ArrayType.sizeof * count);
+
+    // EEEEK. Since arrays differ in implementation,
+    // we can't just malloc the size of an object + the size of the array we want to
+    // allocate for. This is a little tricky way of getting around that --
+    // but this WILL break if T has more then one array.
+    static foreach(_mem; __traits(allMembers, T)) {{
+        alias member = __traits(getMember, T, _mem);
+        static if (isArray!(typeof(member))) {
+            alias ArrayElementType = typeof(member[0]);
+            static if (is(ArrayElementType == ArrayType)) {
+                __traits(child, obj, member) = arr[0 .. count];
+            }  
+        }
+    }}
+    return obj;
+}
+
+T* ALLOCATE_ARRAY(T)(WrenVM* vm, size_t count) @nogc
+{
+    import wren.vm : wrenReallocate;
+    return cast(typeof(return))wrenReallocate(vm, null, 0, T.sizeof * count);
+}
+
+void DEALLOCATE(WrenVM* vm, void* pointer) @nogc
+{
+    import wren.vm : wrenReallocate;
+    wrenReallocate(vm, pointer, 0, 0);
+}
+
