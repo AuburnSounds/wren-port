@@ -1054,7 +1054,7 @@ enum MAP_LOAD_PERCENT = 75;
 // reallocating when the call stack grows.
 enum INITIAL_CALL_FRAMES = 4;
 
-static void initObj(WrenVM* vm, Obj* obj, ObjType type, ObjClass* classObj)
+void initObj(WrenVM* vm, Obj* obj, ObjType type, ObjClass* classObj)
 {
     obj.type = type;
     obj.isDark = false;
@@ -1737,7 +1737,7 @@ Value wrenNewRange(WrenVM* vm, double from, double to, bool isInclusive)
 //
 // The caller is expected to fill in the buffer and then calculate the string's
 // hash.
-static ObjString* allocateString(WrenVM* vm, size_t length)
+ObjString* allocateString(WrenVM* vm, size_t length)
 {
     ObjString* str = ALLOCATE_FLEX!(WrenVM, ObjString, char)(vm, length + 1);
     initObj(vm, &str.obj, ObjType.OBJ_STRING, vm.stringClass);

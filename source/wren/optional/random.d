@@ -4,7 +4,7 @@ import wren.common;
 
 static if (WREN_OPT_RANDOM):
 
-private static const(char)[] randomModuleSource = import("optional/wren_opt_random.wren");
+static immutable string  randomModuleSource = import("optional/wren_opt_random.wren");
 
 // Implements the well equidistributed long-period linear PRNG (WELL512a).
 //

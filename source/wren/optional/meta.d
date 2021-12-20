@@ -5,7 +5,7 @@ import wren.common;
 
 static if (WREN_OPT_META):
 
-private static const(char)[] metaModuleSource = import("optional/wren_opt_meta.wren");
+static immutable string metaModuleSource = import("optional/wren_opt_meta.wren");
 
 void metaCompile(WrenVM* vm) @nogc
 {

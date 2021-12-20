@@ -8,7 +8,7 @@ import wren.vm;
 import dplug.core : mallocNew;
 
 // The core module source that is interpreted whenever core is initialized.
-private static const(char)[] coreModuleSource = import("wren_core.wren");
+static immutable string coreModuleSource = import("wren_core.wren");
 
 /++ Boolean primitives +/
 @WrenPrimitive("Bool", "!") 

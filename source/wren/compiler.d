@@ -442,7 +442,7 @@ void lexError(Parser* parser, const char* format, ...)
 // You'll note that most places that call error() continue to parse and compile
 // after that. That's so that we can try to find as many compilation errors in
 // one pass as possible instead of just bailing at the first one.
-static void error(Compiler* compiler, const char* format, ...)
+void error(Compiler* compiler, const char* format, ...)
 {
     import core.stdc.stdio;
     Token* token = &compiler.parser.previous;
@@ -480,7 +480,7 @@ static void error(Compiler* compiler, const char* format, ...)
 }
 
 // Adds [constant] to the constant pool and returns its index.
-static int addConstant(Compiler* compiler, Value constant)
+int addConstant(Compiler* compiler, Value constant)
 {
     if (compiler.parser.hasError) return -1;
     
@@ -610,25 +610,25 @@ static immutable Keyword[] keywords =
 ];
 
 // Returns true if [c] is a valid (non-initial) identifier character.
-static bool isName(char c)
+bool isName(char c)
 {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
 }
 
 // Returns true if [c] is a digit.
-static bool isDigit(char c)
+bool isDigit(char c)
 {
     return c >= '0' && c <= '9';
 }
 
 // Returns the current character the parser is sitting on.
-static char peekChar(Parser* parser)
+char peekChar(Parser* parser)
 {
     return *parser.currentChar;
 }
 
 // Returns the character after the current character.
-static char peekNextChar(Parser* parser)
+char peekNextChar(Parser* parser)
 {
     // If we're at the end of the source, don't read past it.
     if (peekChar(parser) == '\0') return '\0';
@@ -636,7 +636,7 @@ static char peekNextChar(Parser* parser)
 }
 
 // Advances the parser forward one character.
-static char nextChar(Parser* parser)
+char nextChar(Parser* parser)
 {
     char c = peekChar(parser);
     parser.currentChar++;
@@ -645,7 +645,7 @@ static char nextChar(Parser* parser)
 }
 
 // If the current character is [c], consumes it and returns `true`.
-static bool matchChar(Parser* parser, char c)
+bool matchChar(Parser* parser, char c)
 {
     if (peekChar(parser) != c) return false;
     nextChar(parser);
@@ -716,7 +716,7 @@ void skipBlockComment(Parser* parser)
 
 // Reads the next character, which should be a hex digit (0-9, a-f, or A-F) and
 // returns its numeric value. If the character isn't a hex digit, returns -1.
-static int readHexDigit(Parser* parser)
+int readHexDigit(Parser* parser)
 {
     char c = nextChar(parser);
     if (c >= '0' && c <= '9') return c - '0';
@@ -837,7 +837,7 @@ void readName(Parser* parser, TokenType type, char firstChar)
 }
 
 // Reads [digits] hex digits in a string literal and returns their number value.
-static int readHexEscape(Parser* parser, int digits, const char* description)
+int readHexEscape(Parser* parser, int digits, const char* description)
 {
   int value = 0;
   for (int i = 0; i < digits; i++)
@@ -1231,20 +1231,20 @@ void nextToken(Parser* parser)
 // Parsing ---------------------------------------------------------------------
 
 // Returns the type of the current token.
-static TokenType peek(Compiler* compiler)
+TokenType peek(Compiler* compiler)
 {
   return compiler.parser.current.type;
 }
 
 // Returns the type of the current token.
-static TokenType peekNext(Compiler* compiler)
+TokenType peekNext(Compiler* compiler)
 {
   return compiler.parser.next.type;
 }
 
 // Consumes the current token if its type is [expected]. Returns true if a
 // token was consumed.
-static bool match(Compiler* compiler, TokenType expected)
+bool match(Compiler* compiler, TokenType expected)
 {
     if (peek(compiler) != expected) return false;
 
@@ -1253,8 +1253,7 @@ static bool match(Compiler* compiler, TokenType expected)
 }
 
 // Consumes the current token. Emits an error if its type is not [expected].
-static void consume(Compiler* compiler, TokenType expected,
-                    const char* errorMessage)
+void consume(Compiler* compiler, TokenType expected, const char* errorMessage)
 {
     nextToken(compiler.parser);
     if (compiler.parser.previous.type != expected)
@@ -1268,7 +1267,7 @@ static void consume(Compiler* compiler, TokenType expected,
 }
 
 // Matches one or more newlines. Returns true if at least one was found.
-static bool matchLine(Compiler* compiler)
+bool matchLine(Compiler* compiler)
 {
     if (!match(compiler, TokenType.TOKEN_LINE)) return false;
 
@@ -1277,20 +1276,21 @@ static bool matchLine(Compiler* compiler)
 }
 
 // Discards any newlines starting at the current token.
-static void ignoreNewlines(Compiler* compiler)
+void ignoreNewlines(Compiler* compiler)
 {
     matchLine(compiler);
 }
 
 // Consumes the current token. Emits an error if it is not a newline. Then
 // discards any duplicate newlines following it.
-static void consumeLine(Compiler* compiler, const char* errorMessage)
+void consumeLine(Compiler* compiler, const char* errorMessage)
 {
     consume(compiler, TokenType.TOKEN_LINE, errorMessage);
     ignoreNewlines(compiler);
 }
 
-static void allowLineBeforeDot(Compiler* compiler) {
+void allowLineBeforeDot(Compiler* compiler) 
+{
     if (peek(compiler) == TokenType.TOKEN_LINE && peekNext(compiler) == TokenType.TOKEN_DOT) {
         nextToken(compiler.parser);
     }
@@ -1299,7 +1299,7 @@ static void allowLineBeforeDot(Compiler* compiler) {
 // Variables and scopes --------------------------------------------------------
 
 // Emits one single-byte argument. Returns its index.
-static int emitByte(Compiler* compiler, int byte_)
+int emitByte(Compiler* compiler, int byte_)
 {
     wrenByteBufferWrite(compiler.parser.vm, &compiler.fn.code, cast(ubyte)byte_);
     
@@ -1311,7 +1311,7 @@ static int emitByte(Compiler* compiler, int byte_)
 }
 
 // Emits one bytecode instruction.
-static void emitOp(Compiler* compiler, Code instruction)
+void emitOp(Compiler* compiler, Code instruction)
 {
     emitByte(compiler, instruction);
     
@@ -1324,7 +1324,7 @@ static void emitOp(Compiler* compiler, Code instruction)
 }
 
 // Emits one 16-bit argument, which will be written big endian.
-static void emitShort(Compiler* compiler, int arg)
+void emitShort(Compiler* compiler, int arg)
 {
     emitByte(compiler, (arg >> 8) & 0xff);
     emitByte(compiler, arg & 0xff);
@@ -1332,7 +1332,7 @@ static void emitShort(Compiler* compiler, int arg)
 
 // Emits one bytecode instruction followed by a 8-bit argument. Returns the
 // index of the argument in the bytecode.
-static int emitByteArg(Compiler* compiler, Code instruction, int arg)
+int emitByteArg(Compiler* compiler, Code instruction, int arg)
 {
     emitOp(compiler, instruction);
     return emitByte(compiler, arg);
@@ -1340,7 +1340,7 @@ static int emitByteArg(Compiler* compiler, Code instruction, int arg)
 
 // Emits one bytecode instruction followed by a 16-bit argument, which will be
 // written big endian.
-static void emitShortArg(Compiler* compiler, Code instruction, int arg)
+void emitShortArg(Compiler* compiler, Code instruction, int arg)
 {
     emitOp(compiler, instruction);
     emitShort(compiler, arg);
@@ -1349,7 +1349,7 @@ static void emitShortArg(Compiler* compiler, Code instruction, int arg)
 // Emits [instruction] followed by a placeholder for a jump offset. The
 // placeholder can be patched by calling [jumpPatch]. Returns the index of the
 // placeholder.
-static int emitJump(Compiler* compiler, Code instruction)
+int emitJump(Compiler* compiler, Code instruction)
 {
     emitOp(compiler, instruction);
     emitByte(compiler, 0xff);
@@ -1358,7 +1358,7 @@ static int emitJump(Compiler* compiler, Code instruction)
 
 // Creates a new constant for the current value and emits the bytecode to load
 // it from the constant table.
-static void emitConstant(Compiler* compiler, Value value)
+void emitConstant(Compiler* compiler, Value value)
 {
     int constant = addConstant(compiler, value);
     
@@ -1368,7 +1368,7 @@ static void emitConstant(Compiler* compiler, Value value)
 
 // Create a new local variable with [name]. Assumes the current scope is local
 // and the name is unique.
-static int addLocal(Compiler* compiler, const char* name, int length)
+int addLocal(Compiler* compiler, const char* name, int length)
 {
     Local* local = &compiler.locals[compiler.numLocals];
     local.name = name;
@@ -1381,7 +1381,7 @@ static int addLocal(Compiler* compiler, const char* name, int length)
 // Declares a variable in the current scope whose name is the given token.
 //
 // If [token] is `null`, uses the previously consumed token. Returns its symbol.
-static int declareVariable(Compiler* compiler, Token* token)
+int declareVariable(Compiler* compiler, Token* token)
 {
     if (token == null) token = &compiler.parser.previous;
 
@@ -1448,14 +1448,14 @@ static int declareVariable(Compiler* compiler, Token* token)
 
 // Parses a name token and declares a variable in the current scope with that
 // name. Returns its slot.
-static int declareNamedVariable(Compiler* compiler)
+int declareNamedVariable(Compiler* compiler)
 {
     consume(compiler, TokenType.TOKEN_NAME, "Expect variable name.");
     return declareVariable(compiler, null);
 }
 
 // Stores a variable with the previously defined symbol in the current scope.
-static void defineVariable(Compiler* compiler, int symbol)
+void defineVariable(Compiler* compiler, int symbol)
 {
     // Store the variable. If it's a local, the result of the initializer is
     // in the correct slot on the stack already so we're done.
@@ -1480,7 +1480,7 @@ void pushScope(Compiler* compiler)
 // the break instruction.
 //
 // Returns the number of local variables that were eliminated.
-static int discardLocals(Compiler* compiler, int depth)
+int discardLocals(Compiler* compiler, int depth)
 {
     if (compiler.scopeDepth < -1)
         throw mallocNew!Error("Cannot exit top-level scope.");
@@ -1522,7 +1522,7 @@ void popScope(Compiler* compiler)
 
 // Attempts to look up the name in the local variables of [compiler]. If found,
 // returns its index, otherwise returns -1.
-static int resolveLocal(Compiler* compiler, const char* name, int length)
+int resolveLocal(Compiler* compiler, const char* name, int length)
 {
     import core.stdc.string : memcmp;
     // Look it up in the local scopes. Look in reverse order so that the most
@@ -1542,7 +1542,7 @@ static int resolveLocal(Compiler* compiler, const char* name, int length)
 // Adds an upvalue to [compiler]'s function with the given properties. Does not
 // add one if an upvalue for that variable is already in the list. Returns the
 // index of the upvalue.
-static int addUpvalue(Compiler* compiler, bool isLocal, int index)
+int addUpvalue(Compiler* compiler, bool isLocal, int index)
 {
     // Look for an existing one.
     for (int i = 0; i < compiler.fn.numUpvalues; i++)
@@ -1568,7 +1568,7 @@ static int addUpvalue(Compiler* compiler, bool isLocal, int index)
 //
 // If it reaches a method boundary, this stops and returns -1 since methods do
 // not close over local variables.
-static int findUpvalue(Compiler* compiler, const char* name, int length)
+int findUpvalue(Compiler* compiler, const char* name, int length)
 {
     // If we are at the top level, we didn't find it.
     if (compiler.parent == null) return -1;
@@ -1609,8 +1609,7 @@ static int findUpvalue(Compiler* compiler, const char* name, int length)
 // Returns the variable either in local scope, or the enclosing function's
 // upvalue list. Does not search the module scope. Returns a variable with
 // index -1 if not found.
-static Variable resolveNonmodule(Compiler* compiler,
-                                 const char* name, int length)
+Variable resolveNonmodule(Compiler* compiler, const char* name, int length)
 {
     // Look it up in the local scopes.
     Variable variable;
@@ -1627,7 +1626,7 @@ static Variable resolveNonmodule(Compiler* compiler,
 // Look up [name] in the current scope to see what variable it refers to.
 // Returns the variable either in module scope, local scope, or the enclosing
 // function's upvalue list. Returns a variable with index -1 if not found.
-static Variable resolveName(Compiler* compiler, const char* name, int length)
+Variable resolveName(Compiler* compiler, const char* name, int length)
 {
     Variable variable = resolveNonmodule(compiler, name, length);
     if (variable.index != -1) return variable;
@@ -1652,8 +1651,7 @@ void loadLocal(Compiler* compiler, int slot)
 // Finishes [compiler], which is compiling a function, method, or chunk of top
 // level code. If there is a parent compiler, then this emits code in the
 // parent compiler to load the resulting function.
-static ObjFn* endCompiler(Compiler* compiler,
-                          const char* debugName, int debugNameLength)
+ObjFn* endCompiler(Compiler* compiler, const char* debugName, int debugNameLength)
 {
     // If we hit an error, don't finish the function since it's borked anyway.
     if (compiler.parser.hasError)
@@ -1754,7 +1752,7 @@ void patchJump(Compiler* compiler, int offset)
 // Returns true if it was a expression body, false if it was a statement body.
 // (More precisely, returns true if a value was left on the stack. An empty
 // block returns false.)
-static bool finishBlock(Compiler* compiler)
+bool finishBlock(Compiler* compiler)
 {
     // Empty blocks do nothing.
     if (match(compiler, TokenType.TOKEN_RIGHT_BRACE)) return false;
@@ -1786,7 +1784,7 @@ static bool finishBlock(Compiler* compiler)
 //
 // If [Compiler.isInitializer] is `true`, this is the body of a constructor
 // initializer. In that case, this adds the code to ensure it returns `this`.
-static void finishBody(Compiler* compiler)
+void finishBody(Compiler* compiler)
 {
     bool isExpressionBody = finishBlock(compiler);
 
@@ -1822,7 +1820,7 @@ void validateNumParameters(Compiler* compiler, int numArgs)
 
 // Parses the rest of a comma-separated parameter list after the opening
 // delimeter. Updates `arity` in [signature] with the number of parameters.
-static void finishParameterList(Compiler* compiler, Signature* signature)
+void finishParameterList(Compiler* compiler, Signature* signature)
 {
     do
     {
@@ -1836,7 +1834,7 @@ static void finishParameterList(Compiler* compiler, Signature* signature)
 }
 
 // Gets the symbol for a method [name] with [length].
-static int methodSymbol(Compiler* compiler, const char* name, int length)
+int methodSymbol(Compiler* compiler, const char* name, int length)
 {
     return wrenSymbolTableEnsure(compiler.parser.vm,
         &compiler.parser.vm.methodNames, name, length);
