@@ -139,67 +139,67 @@ void wrenValueBufferWrite(VM)(VM* vm, ValueBuffer* buffer, Value data) @nogc
 // These macros cast a Value to one of the specific object types. These do *not*
 // perform any validation, so must only be used after the Value has been
 // ensured to be the right type.
-ObjClass* AS_CLASS(Value value)
+ObjClass* AS_CLASS(Value value) nothrow
 {
     return cast(ObjClass*)AS_OBJ(value);
 }
 
-ObjClosure* AS_CLOSURE(Value value)
+ObjClosure* AS_CLOSURE(Value value) nothrow
 {
     return cast(ObjClosure*)AS_OBJ(value);
 }
 
-ObjFiber* AS_FIBER(Value value)
+ObjFiber* AS_FIBER(Value value) nothrow
 {
     return cast(ObjFiber*)AS_OBJ(value);
 }
 
-ObjFn* AS_FN(Value value)
+ObjFn* AS_FN(Value value) nothrow
 {
     return cast(ObjFn*)AS_OBJ(value);
 }
 
-ObjForeign* AS_FOREIGN(Value value)
+ObjForeign* AS_FOREIGN(Value value) nothrow
 {
     return cast(ObjForeign*)AS_OBJ(value);
 }
 
-ObjInstance* AS_INSTANCE(Value value)
+ObjInstance* AS_INSTANCE(Value value) nothrow
 {
     return cast(ObjInstance*)AS_OBJ(value);
 }
 
-ObjList* AS_LIST(Value value)
+ObjList* AS_LIST(Value value) nothrow
 {
     return cast(ObjList*)AS_OBJ(value);
 }
 
-ObjMap* AS_MAP(Value value)
+ObjMap* AS_MAP(Value value) nothrow
 {
     return cast(ObjMap*)AS_OBJ(value);
 }
 
-ObjModule* AS_MODULE(Value value)
+ObjModule* AS_MODULE(Value value) nothrow
 {
     return cast(ObjModule*)AS_OBJ(value);
 }
 
-double AS_NUM(Value value)
+double AS_NUM(Value value) nothrow
 {
     return wrenValueToNum(value);
 }
 
-ObjRange* AS_RANGE(Value value)
+ObjRange* AS_RANGE(Value value) nothrow
 {
     return cast(ObjRange*)AS_OBJ(value);
 }
 
-ObjString* AS_STRING(Value value)
+ObjString* AS_STRING(Value value) nothrow
 {
     return cast(ObjString*)AS_OBJ(value);
 }
 
-const(char)* AS_CSTRING(Value value)
+const(char)* AS_CSTRING(Value value) nothrow
 {
     return (AS_STRING(value).value.ptr);
 }
@@ -207,64 +207,64 @@ const(char)* AS_CSTRING(Value value)
 // These macros promote a primitive C value to a full Wren Value. There are
 // more defined below that are specific to the Nan tagged or other
 // representation.
-Value BOOL_VAL(bool value)
+Value BOOL_VAL(bool value) nothrow
 {
     return value ? TRUE_VAL : FALSE_VAL;
 }
 
-Value NUM_VAL(double num)
+Value NUM_VAL(double num) nothrow
 {
     return wrenNumToValue(num);
 }
 
-Value OBJ_VAL(T)(T* obj)
+Value OBJ_VAL(T)(T* obj) nothrow
 {
     return wrenObjectToValue(cast(Obj*)obj);
 }
 
 // These perform type tests on a Value, returning `true` if the Value is of the
 // given type.
-bool IS_BOOL(Value value) {
+bool IS_BOOL(Value value) nothrow {
     return wrenIsBool(value);
 }
 
-bool IS_CLASS(Value value) {
+bool IS_CLASS(Value value) nothrow {
     return wrenIsObjType(value, ObjType.OBJ_CLASS);
 }
 
-bool IS_CLOSURE(Value value) {
+bool IS_CLOSURE(Value value) nothrow {
     return wrenIsObjType(value, ObjType.OBJ_CLOSURE);
 }
 
-bool IS_FIBER(Value value) {
+bool IS_FIBER(Value value) nothrow {
     return wrenIsObjType(value, ObjType.OBJ_FIBER);
 }
 
-bool IS_FN(Value value) {
+bool IS_FN(Value value) nothrow {
     return wrenIsObjType(value, ObjType.OBJ_FN);
 }
 
-bool IS_FOREIGN(Value value) {
+bool IS_FOREIGN(Value value) nothrow {
     return wrenIsObjType(value, ObjType.OBJ_FOREIGN);
 }
 
-bool IS_INSTANCE(Value value) {
+bool IS_INSTANCE(Value value) nothrow {
     return wrenIsObjType(value, ObjType.OBJ_INSTANCE);
 }
 
-bool IS_LIST(Value value) {
+bool IS_LIST(Value value) nothrow {
     return wrenIsObjType(value, ObjType.OBJ_LIST);
 }
 
-bool IS_MAP(Value value) {
+bool IS_MAP(Value value) nothrow {
     return wrenIsObjType(value, ObjType.OBJ_MAP);
 }
 
-bool IS_RANGE(Value value) {
+bool IS_RANGE(Value value) nothrow {
     return wrenIsObjType(value, ObjType.OBJ_RANGE);
 }
 
-bool IS_STRING(Value value) {
+bool IS_STRING(Value value) nothrow {
     return wrenIsObjType(value, ObjType.OBJ_STRING);
 }
 
@@ -830,28 +830,28 @@ static if (WREN_NAN_TAGGING)
     enum QNAN = cast(ulong)0x7ffc000000000000;
 
     // If the NaN bits are set, it's not a number.
-    bool IS_NUM(Value value)
+    bool IS_NUM(Value value) nothrow
     {
         return (((value) & QNAN) != QNAN);
     }
 
     // An object pointer is a NaN with a set sign bit.
-    bool IS_OBJ(Value value)
+    bool IS_OBJ(Value value) nothrow
     {
         return (((value) & (QNAN | SIGN_BIT)) == (QNAN | SIGN_BIT));
     }
 
-    bool IS_FALSE(Value value)
+    bool IS_FALSE(Value value) nothrow
     {
         return ((value) == FALSE_VAL);
     }
 
-    bool IS_NULL(Value value)
+    bool IS_NULL(Value value) nothrow
     {
         return ((value) == NULL_VAL);
     }
 
-    bool IS_UNDEFINED(Value value)
+    bool IS_UNDEFINED(Value value) nothrow
     {
         return ((value) == UNDEFINED_VAL);
     }
@@ -876,7 +876,7 @@ static if (WREN_NAN_TAGGING)
     }
 
     // Value . Obj*.
-    Obj* AS_OBJ(Value value)
+    Obj* AS_OBJ(Value value) nothrow
     {
         return (cast(Obj*)cast(ulong)((value) & ~(SIGN_BIT | QNAN)));
     } 
@@ -957,7 +957,7 @@ bool wrenValuesSame(Value a, Value b)
 
 // Returns true if [value] is a bool. Do not call this directly, instead use
 // [IS_BOOL].
-bool wrenIsBool(Value value)
+bool wrenIsBool(Value value) nothrow
 {
     static if (WREN_NAN_TAGGING)
     {
@@ -971,13 +971,13 @@ bool wrenIsBool(Value value)
 
 // Returns true if [value] is an object of type [type]. Do not call this
 // directly, instead use the [IS___] macro for the type in question.
-bool wrenIsObjType(Value value, ObjType type)
+bool wrenIsObjType(Value value, ObjType type) nothrow
 {
     return IS_OBJ(value) && AS_OBJ(value).type == type;
 }
 
 // Converts the raw object pointer [obj] to a [Value].
-Value wrenObjectToValue(Obj* obj)
+Value wrenObjectToValue(Obj* obj) nothrow
 {
     static if (WREN_NAN_TAGGING)
     {
@@ -993,7 +993,7 @@ Value wrenObjectToValue(Obj* obj)
 }
 
 // Interprets [value] as a [double].
-double wrenValueToNum(Value value)
+double wrenValueToNum(Value value) nothrow
 {
     static if (WREN_NAN_TAGGING)
     {
@@ -1006,7 +1006,7 @@ double wrenValueToNum(Value value)
 }
 
 // Converts [num] to a [Value].
-Value wrenNumToValue(double num)
+Value wrenNumToValue(double num) nothrow
 {
     static if (WREN_NAN_TAGGING)
     {
@@ -1054,7 +1054,7 @@ enum MAP_LOAD_PERCENT = 75;
 // reallocating when the call stack grows.
 enum INITIAL_CALL_FRAMES = 4;
 
-void initObj(WrenVM* vm, Obj* obj, ObjType type, ObjClass* classObj)
+void initObj(WrenVM* vm, Obj* obj, ObjType type, ObjClass* classObj) nothrow
 {
     obj.type = type;
     obj.isDark = false;

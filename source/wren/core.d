@@ -1381,6 +1381,16 @@ bool string_iteratorValue(WrenVM* vm, Value* args) @nogc
     return RETURN_VAL(args, wrenStringCodePointAt(vm, string_, index));
 }
 
+@WrenPrimitive("String", "$")
+bool string_dollar(WrenVM* vm, Value* args) @nogc
+{
+    if (vm.config.dollarOperatorFn)
+        return vm.config.dollarOperatorFn(vm, args);
+
+    // By default, return null, however can be set by the host to mean anything.
+    return RETURN_NULL(args);
+}
+
 @WrenPrimitive("String", "+(_)")
 bool string_plus(WrenVM* vm, Value* args) @nogc
 {

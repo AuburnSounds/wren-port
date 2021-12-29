@@ -9,12 +9,12 @@ enum WREN_DOUBLE_QNAN_POS_MAX_BITS = cast(ulong)(0x7FFFFFFFFFFFFFFF);
 
 enum WREN_DOUBLE_NAN = wrenDoubleFromBits(WREN_DOUBLE_QNAN_POS_MIN_BITS);
 
-double wrenDoubleFromBits(ulong bits)
+double wrenDoubleFromBits(ulong bits) nothrow
 {
     return *cast(double*)&bits;
 }
 
-ulong wrenDoubleToBits(double num)
+ulong wrenDoubleToBits(double num) nothrow
 {
     return *cast(ulong*)&num;
 }

@@ -157,38 +157,38 @@ template PRIMITIVE(alias name,
     }
 }
 
-bool RETURN_VAL(Value* args, Value v)
+bool RETURN_VAL(Value* args, Value v) nothrow
 {
     args[0] = v;
     return true;
 }
 
-bool RETURN_OBJ(T)(Value* args, T* obj)
+bool RETURN_OBJ(T)(Value* args, T* obj) nothrow
 {
     return RETURN_VAL(args, OBJ_VAL(obj));
 }
 
-bool RETURN_BOOL(Value* args, bool val)
+bool RETURN_BOOL(Value* args, bool val) nothrow
 {
     return RETURN_VAL(args, BOOL_VAL(val));
 }
 
-bool RETURN_FALSE(Value* args)
+bool RETURN_FALSE(Value* args) nothrow
 {
     return RETURN_VAL(args, FALSE_VAL);
 }
 
-bool RETURN_NULL(Value* args)
+bool RETURN_NULL(Value* args) nothrow
 {
     return RETURN_VAL(args, NULL_VAL);
 }
 
-bool RETURN_NUM(N)(Value* args, N val)
+bool RETURN_NUM(N)(Value* args, N val) nothrow
 {
     return RETURN_VAL(args, NUM_VAL(val));
 }
 
-bool RETURN_TRUE(Value* args)
+bool RETURN_TRUE(Value* args) nothrow
 {
     return RETURN_VAL(args, TRUE_VAL);
 }

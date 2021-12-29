@@ -74,6 +74,10 @@ alias WrenBindForeignMethodFn = WrenForeignMethodFn function(WrenVM* vm,
 // Displays a string of text to the user.
 alias WrenWriteFn = void function(WrenVM* vm, const(char)* text);
 
+// Return result of $(String). Defaults to null, but this can be a host-provided value.
+// args[0] will contain the string identifier.
+alias WrenDollarOperatorFn = bool function(WrenVM* vm, Value* args);
+
 enum WrenErrorType
 {
     // A syntax or resolution error detected at compile time.
@@ -200,6 +204,11 @@ struct WrenConfiguration
     // number, and an error message. If this is `null`, Wren doesn't report any
     // errors.
     WrenErrorFn errorFn;
+
+    // Wren extension.
+    //
+    // This is a host-provided meaning for $(String).
+    WrenDollarOperatorFn dollarOperatorFn;
 
     // The number of bytes Wren will allocate before triggering the first garbage
     // collection.
@@ -380,6 +389,7 @@ void wrenInitConfiguration(WrenConfiguration* config)
     config.bindForeignClassFn = null;
     config.writeFn = null;
     config.errorFn = null;
+    config.dollarOperatorFn = null;
     config.initialHeapSize = 1024 * 1024 * 10;
     config.minHeapSize = 1024 * 1024;
     config.heapGrowthPercent = 50;

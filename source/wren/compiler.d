@@ -134,7 +134,10 @@ enum TokenType
     TOKEN_LINE,
 
     TOKEN_ERROR,
-    TOKEN_EOF
+    TOKEN_EOF,
+
+    // Wren-extension
+    TOKEN_DOLLAR
 }
 
 struct Token
@@ -1100,6 +1103,7 @@ void nextToken(Parser* parser)
         case '+': makeToken(parser, TokenType.TOKEN_PLUS); return;
         case '-': makeToken(parser, TokenType.TOKEN_MINUS); return;
         case '~': makeToken(parser, TokenType.TOKEN_TILDE); return;
+        case '$': makeToken(parser, TokenType.TOKEN_DOLLAR); return;
         case '?': makeToken(parser, TokenType.TOKEN_QUESTION); return;
             
         case '|': twoCharToken(parser, '|', TokenType.TOKEN_PIPEPIPE, TokenType.TOKEN_PIPE); return;
@@ -2800,7 +2804,8 @@ static immutable GrammarRule[] rules = [
   /* TOKEN_INTERPOLATION */ PREFIX!(stringInterpolation),
   /* TOKEN_LINE          */ UNUSED,
   /* TOKEN_ERROR         */ UNUSED,
-  /* TOKEN_EOF           */ UNUSED
+  /* TOKEN_EOF           */ UNUSED,
+  /* TOKEN_DOLLAR        */ PREFIX_OPERATOR!("$"),
 ];
 
 // Gets the [GrammarRule] associated with tokens of [type].
