@@ -2390,21 +2390,24 @@ void wrenFreeObj(WrenVM* vm, Obj* obj)
         }
 
         case ObjType.OBJ_FOREIGN:
-            assert(0, "stub");
-        
+        {
+            wrenFinalizeForeign(vm, cast(ObjForeign*)obj);
+            break;
+        }
+
         case ObjType.OBJ_LIST:
             wrenValueBufferClear(vm, &(cast(ObjList*)obj).elements);
             break;
-        
+
         case ObjType.OBJ_MAP:
             DEALLOCATE(vm, (cast(ObjMap*)obj).entries);
             break;
-        
+
         case ObjType.OBJ_MODULE:
             wrenSymbolTableClear(vm, &(cast(ObjModule*)obj).variableNames);
             wrenValueBufferClear(vm, &(cast(ObjModule*)obj).variables);
             break;
-        
+
         case ObjType.OBJ_CLOSURE:
         case ObjType.OBJ_INSTANCE:
         case ObjType.OBJ_RANGE:
@@ -2413,7 +2416,7 @@ void wrenFreeObj(WrenVM* vm, Obj* obj)
             break;
         
         default:
-            assert(0, "Unexpected object type");       
+            assert(0, "Unexpected object type");
     }
 }
 
