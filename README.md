@@ -6,12 +6,17 @@
 The original Wren implementation is [here](https://github.com/wren-lang).
 
 
-# Changes from original
+## Changes from original
 
-## `$` operator
+### `$` operator
 
-The `$` operator is calling a host-provided function (`dollarOperatorFn`).
-This allow to query entities with a nice syntax: `($"entityName)`.
+The new `$` operator is calling a host-provided function.
+This allow to query entities with a nice syntax.
+
+_Example:_
+```wren
+($"_imageKnob").hasTrail = false
+```
 
 
 
