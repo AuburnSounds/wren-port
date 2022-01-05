@@ -5,4 +5,14 @@
 
 The original Wren implementation is [here](https://github.com/wren-lang).
 
+
+# Changes from original
+
+## `$` operator
+
+The `$` operator is calling a host-provided function (`dollarOperatorFn`).
+This allow to query entities with a nice syntax: `($"entityName)`.
+
+
+
 _This translation was performed by [int3 Systems](https://0xcc.pw/) and sponsored by [Auburn Sounds](https://www.auburnsounds.com)._
