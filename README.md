@@ -8,6 +8,12 @@ The original Wren implementation is [here](https://github.com/wren-lang).
 
 ## Changes from original
 
+
+### Build information
+
+`System.isDebugBuild` allows to know if the -debug flag was used to build Wren, in case you want to disable some sort of live-scripting at release.
+
+
 ### `$` operator
 
 The new `$` operator is calling a host-provided function.

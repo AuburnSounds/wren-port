@@ -1461,6 +1461,20 @@ bool system_writeString(WrenVM* vm, Value* args) @nogc
     return RETURN_VAL(args, args[1]);
 }
 
+// Wren addition for D embedding
+@WrenPrimitive("System", "isDebugBuild")
+bool system_is_debug_build(WrenVM* vm, Value* args) @nogc
+{
+    debug
+    {    
+        return RETURN_BOOL(args, true);
+    }
+    else
+    {
+        return RETURN_BOOL(args, false);
+    }
+}
+
 // Creates either the Object or Class class in the core module with [name].
 ObjClass* defineClass(WrenVM* vm, ObjModule* module_, const(char)* name) @nogc
 {
