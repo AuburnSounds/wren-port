@@ -13,6 +13,11 @@ The original Wren implementation is [here](https://github.com/wren-lang).
 
 `System.isDebugBuild` allows to know if the -debug flag was used to build Wren, in case you want to disable some sort of live-scripting at release.
 
+### Float literal terminal character
+
+`1.0f`, `2L` and `2.0F` are valid Wren double literals in this fork.
+This helps sharing bits of code between D and Wren.
+
 
 ### `$` operator
 
