@@ -803,6 +803,10 @@ void readNumber(Parser* parser)
         while (isDigit(peekChar(parser))) nextChar(parser);
     }
 
+    // Note: much like D, we accept a 'f', 'F', or 'L' suffix. But it won't count in the literal,
+    // which is always double. This ease sharing bits of code between Wren and D.
+    matchChar(parser, 'f') || matchChar(parser, 'F') || matchChar(parser, 'L');
+
     makeNumber(parser, false);
 }
 
