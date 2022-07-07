@@ -16,16 +16,27 @@ void main()
 	WrenVM* vm = wrenNewVM(&config);
 
 	const(char)* module_ = "main";
-	const(char)* script = 
+    string script = import("script.wren");
+
+	/*const(char)* script = 
         "class Test {\n" ~
         "    construct new() {\n" ~
         "    }\n" ~
         "    foreign myfun_(a, b, c)" ~
         "}\n"~
+        "class Test2 {\n" ~
+        "    construct new(e) {\n" ~
+        "        _e = e\n" ~
+        "    }\n" ~
+        "    myprop=(x) {\n" ~
+        "        _e.myfun_(0, 1, x)\n" ~
+        "    }\n" ~
+        "}\n"~
         "var c = Test.new()\n" ~
-        "c.myfun_(1,2,3)\n";
+        "var b = Test2.new(c)\n" ~
+        "b.myprop = 0.65\n";*/
 
-	WrenInterpretResult result = wrenInterpret(vm, module_, script);
+	WrenInterpretResult result = wrenInterpret(vm, module_, script.ptr);
 	switch (result) with(WrenInterpretResult)
 	{
 		case WREN_RESULT_COMPILE_ERROR:
