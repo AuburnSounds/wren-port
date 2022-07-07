@@ -1,0 +1,5 @@
+name "foreign"
+description "Showcase Wren foreign functions."
+copyright "Copyright © 2022, Guillaume Piolat"
+license "BSL-1.0"
+dependency "wren-port" path="../../"
