@@ -8,6 +8,7 @@ import wren.vm;
 
 // So we can throw errors without statically allocating them
 import dplug.core : mallocNew;
+import dplug.core.string;
 
 @nogc:
 // This is written in bottom-up order, so the tokenization comes first, then
@@ -746,7 +747,7 @@ void makeNumber(Parser* parser, bool isHex)
     }
     else
     {
-        parser.next.value = NUM_VAL(strtod(parser.tokenStart, null));
+        parser.next.value = NUM_VAL(strtod_nolocale(parser.tokenStart, null));
     }
 
     if (errno == ERANGE)
