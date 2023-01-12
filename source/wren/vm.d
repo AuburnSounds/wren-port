@@ -5,7 +5,7 @@ import wren.opcodes;
 import wren.value;
 import wren.utils;
 
-@nogc:
+nothrow @nogc:
 
 // The type of a primitive function.
 //

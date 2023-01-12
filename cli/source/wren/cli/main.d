@@ -1,8 +1,12 @@
 module wren.cli.main;
+
 import std.getopt;
 import std.stdio;
+import std.string;
+
 import wren.cli.vm;
 import wren.vm;
+import wren.common;
 
 int main(string[] args)
 {
@@ -19,7 +23,6 @@ int main(string[] args)
 
 	if (version_)
 	{
-		import wren.common : WREN_VERSION_STRING;
 		writefln("wren %s", WREN_VERSION_STRING);
 		return 0;
 	}
@@ -31,7 +34,6 @@ int main(string[] args)
 	}
 	else
 	{
-		import std.string : toStringz;
 		result = runFile(args[1].toStringz);
 	}
 

@@ -3,7 +3,7 @@ import wren.common;
 import wren.math;
 import wren.utils;
 
-@nogc:
+nothrow @nogc:
 // This defines the built-in types and their core representations in memory.
 // Since Wren is dynamically typed, any variable can hold a value of any type,
 // and the type can change at runtime. Implementing this efficiently is

@@ -1,7 +1,13 @@
 module wren.cli.vm;
 import wren.vm;
 
+import core.stdc.stdio;
+import core.stdc.stdlib;
+import wren.common;
+
 __gshared WrenVM* vm;
+
+nothrow @nogc:
 
 // Reads the contents of the file at [path] and returns it as a heap allocated
 // string.
@@ -10,9 +16,6 @@ __gshared WrenVM* vm;
 // could not be read.
 char* readFile(const char* path) @nogc
 {
-    import core.stdc.stdio : fopen, FILE, fread, fseek, ftell, rewind, fprintf, fclose, SEEK_END, stderr;
-    import core.stdc.stdlib : malloc;
-
     FILE* file = fopen(path, "rb");
     if (file == null) return null;
     
@@ -46,15 +49,12 @@ char* readFile(const char* path) @nogc
 
 void write(WrenVM* vm, const(char)* text) @nogc
 {
-    import core.stdc.stdio : printf;
     printf("%s", text);
 }
 
 void reportError(WrenVM* vm, WrenErrorType type,
                  const(char)* module_, int line, const(char)* message) @nogc
 {
-    import core.stdc.stdio : fprintf, stderr;
-
     switch (type) with(WrenErrorType)
     {
         case WREN_ERROR_COMPILE:
@@ -93,9 +93,6 @@ void freeVM()
 
 WrenInterpretResult runFile(const(char)* path)
 {
-    import core.stdc.stdio : fprintf, stderr;
-    import core.stdc.stdlib : free;
-
     char* source = readFile(path);
     if (source == null)
     {
@@ -121,9 +118,6 @@ WrenInterpretResult runFile(const(char)* path)
 
 WrenInterpretResult runRepl()
 {
-    import core.stdc.stdio : printf;
-    import wren.common : WREN_VERSION_STRING;
-
     initVM();
 
     printf("\\\\/\"-\n");

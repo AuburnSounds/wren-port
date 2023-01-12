@@ -4,8 +4,7 @@ import wren.primitive;
 import wren.value;
 import wren.vm;
 
-// Throwing exception support
-import dplug.core : mallocNew;
+nothrow @nogc:
 
 // The core module source that is interpreted whenever core is initialized.
 static immutable string coreModuleSource = import("wren_core.wren");
@@ -1088,9 +1087,6 @@ bool object_is(WrenVM* vm, Value* args) @nogc
 @WrenPrimitive("Object", "toString")
 bool object_toString(WrenVM* vm, Value* args) @nogc
 {
-    if (!IS_OBJ(args[0]))
-        throw mallocNew!Error("Received `this` which is not an object for Object.toString");
-
     Obj* obj = AS_OBJ(args[0]);
     Value name = OBJ_VAL(obj.classObj.name);
     return RETURN_VAL(args, wrenStringFormat(vm, "instance of @", name));

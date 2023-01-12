@@ -2,7 +2,7 @@ module wren.primitive;
 import wren.value;
 import wren.vm : WrenVM;
 
-@nogc:
+nothrow @nogc:
 
 // Validates that [value] is an integer within `[0, count)`. Also allows
 // negative indices which map backwards from the end. Returns the valid positive
