@@ -1485,19 +1485,6 @@ ObjClass* defineClass(WrenVM* vm, ObjModule* module_, const(char)* name) @nogc
   return classObj;
 }
 
-private void registerPrimitives(string className)(WrenVM* vm, ObjClass* classObj) {
-    static foreach(_mem; __traits(allMembers, mixin(__MODULE__)))
-    {{
-        import std.traits : getUDAs, hasUDA;
-        alias member = __traits(getMember, mixin(__MODULE__), _mem);
-        static if (hasUDA!(member, WrenPrimitive)) {
-            enum primDef = getUDAs!(member, WrenPrimitive)[0];
-            static if (primDef.className == className) {
-                PRIMITIVE!(primDef.primitiveName, member, primDef.methodType, primDef.registerToSuperClass)(vm, classObj);
-            }
-        }
-    }}
-}
 
 void wrenInitializeCore(WrenVM* vm) @nogc
 {
@@ -1511,12 +1498,19 @@ void wrenInitializeCore(WrenVM* vm) @nogc
     // Define the root Object class. This has to be done a little specially
     // because it has no superclass.
     vm.objectClass = defineClass(vm, coreModule, "Object");
-    registerPrimitives!("Object")(vm, vm.objectClass);
+
+    //registerPrimitives!("Object")(vm, vm.objectClass);
+    addPrimitive(vm, vm.objectClass, "!"        , &object_not     , MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.objectClass, "==(_)"    , &object_eqeq    , MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.objectClass, "!=(_)"    , &object_bangeq  , MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.objectClass, "is(_)"    , &object_is      , MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.objectClass, "toString" , &object_toString, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.objectClass, "type"     , &object_type    , MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.objectClass, "same(_,_)", &object_same    , MethodType.METHOD_PRIMITIVE, false);
 
     // Now we can define Class, which is a subclass of Object.
     vm.classClass = defineClass(vm, coreModule, "Class");
     wrenBindSuperclass(vm, vm.classClass, vm.objectClass);
-    // TODO: define primitives
 
     // Finally, we can define Object's metaclass which is a subclass of Class.
     ObjClass* objectMetaclass = defineClass(vm, coreModule, "Object metaclass");
@@ -1529,7 +1523,7 @@ void wrenInitializeCore(WrenVM* vm) @nogc
     // Do this after wiring up the metaclasses so objectMetaclass doesn't get
     // collected.
     wrenBindSuperclass(vm, objectMetaclass, vm.classClass);
-    registerPrimitives!("Object metaclass")(vm, objectMetaclass);
+    addPrimitive(vm, objectMetaclass, "same(_,_)", &object_same, MethodType.METHOD_PRIMITIVE, false);
 
     // The core class diagram ends up looking like this, where single lines point
     // to a class's superclass, and double lines point to its metaclass:
@@ -1557,34 +1551,163 @@ void wrenInitializeCore(WrenVM* vm) @nogc
     wrenInterpret(vm, null, coreModuleSource.ptr);
 
     vm.boolClass = AS_CLASS(wrenFindVariable(vm, coreModule, "Bool"));
-    registerPrimitives!("Bool")(vm, vm.boolClass);
+    addPrimitive(vm, vm.boolClass, "!", &bool_not, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.boolClass, "toString", &bool_toString, MethodType.METHOD_PRIMITIVE, false);
 
     vm.fiberClass = AS_CLASS(wrenFindVariable(vm, coreModule, "Fiber"));
-    registerPrimitives!("Fiber")(vm, vm.fiberClass);
+    addPrimitive(vm, vm.fiberClass, "new(_)", &fiber_new, MethodType.METHOD_PRIMITIVE, true);
+    addPrimitive(vm, vm.fiberClass, "abort(_)", &fiber_abort, MethodType.METHOD_PRIMITIVE, true);
+    addPrimitive(vm, vm.fiberClass, "current", &fiber_current, MethodType.METHOD_PRIMITIVE, true);
+    addPrimitive(vm, vm.fiberClass, "suspend()", &fiber_suspend, MethodType.METHOD_PRIMITIVE, true);
+    addPrimitive(vm, vm.fiberClass, "yield()", &fiber_yield, MethodType.METHOD_PRIMITIVE, true);
+    addPrimitive(vm, vm.fiberClass, "yield(_)", &fiber_yield1, MethodType.METHOD_PRIMITIVE, true);
+    addPrimitive(vm, vm.fiberClass, "call()", &fiber_call, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.fiberClass, "call(_)", &fiber_call1, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.fiberClass, "error", &fiber_error, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.fiberClass, "isDone", &fiber_isDone, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.fiberClass, "transfer()", &fiber_transfer, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.fiberClass, "transfer(_)", &fiber_transfer1, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.fiberClass, "transferError(_)", &fiber_transferError, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.fiberClass, "try()", &fiber_try, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.fiberClass, "try(_)", &fiber_try1, MethodType.METHOD_PRIMITIVE, false);
 
     vm.fnClass = AS_CLASS(wrenFindVariable(vm, coreModule, "Fn"));
-    registerPrimitives!("Fn")(vm, vm.fnClass);
+    addPrimitive(vm, vm.fnClass, "new(_)", &fn_new, MethodType.METHOD_PRIMITIVE, true);
+    addPrimitive(vm, vm.fnClass, "arity", &fn_arity, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.fnClass, "call()", &fn_call0, MethodType.METHOD_FUNCTION_CALL, false);
+    addPrimitive(vm, vm.fnClass, "call(_)", &fn_call1, MethodType.METHOD_FUNCTION_CALL, false);
+    addPrimitive(vm, vm.fnClass, "call(_,_)", &fn_call2, MethodType.METHOD_FUNCTION_CALL, false);
+    addPrimitive(vm, vm.fnClass, "call(_,_,_)", &fn_call3, MethodType.METHOD_FUNCTION_CALL, false);
+    addPrimitive(vm, vm.fnClass, "call(_,_,_,_)", &fn_call4, MethodType.METHOD_FUNCTION_CALL, false);
+    addPrimitive(vm, vm.fnClass, "call(_,_,_,_,_)", &fn_call5, MethodType.METHOD_FUNCTION_CALL, false);
+    addPrimitive(vm, vm.fnClass, "call(_,_,_,_,_,_)", &fn_call6, MethodType.METHOD_FUNCTION_CALL, false);
+    addPrimitive(vm, vm.fnClass, "call(_,_,_,_,_,_,_)", &fn_call7, MethodType.METHOD_FUNCTION_CALL, false);
+    addPrimitive(vm, vm.fnClass, "call(_,_,_,_,_,_,_,_)", &fn_call8, MethodType.METHOD_FUNCTION_CALL, false);
+    addPrimitive(vm, vm.fnClass, "call(_,_,_,_,_,_,_,_,_)", &fn_call9, MethodType.METHOD_FUNCTION_CALL, false);
+    addPrimitive(vm, vm.fnClass, "call(_,_,_,_,_,_,_,_,_,_)", &fn_call10, MethodType.METHOD_FUNCTION_CALL, false);
+    addPrimitive(vm, vm.fnClass, "call(_,_,_,_,_,_,_,_,_,_,_)", &fn_call11, MethodType.METHOD_FUNCTION_CALL, false);
+    addPrimitive(vm, vm.fnClass, "call(_,_,_,_,_,_,_,_,_,_,_,_)", &fn_call12, MethodType.METHOD_FUNCTION_CALL, false);
+    addPrimitive(vm, vm.fnClass, "call(_,_,_,_,_,_,_,_,_,_,_,_,_)", &fn_call13, MethodType.METHOD_FUNCTION_CALL, false);
+    addPrimitive(vm, vm.fnClass, "call(_,_,_,_,_,_,_,_,_,_,_,_,_,_)", &fn_call14, MethodType.METHOD_FUNCTION_CALL, false);
+    addPrimitive(vm, vm.fnClass, "call(_,_,_,_,_,_,_,_,_,_,_,_,_,_,_)", &fn_call15, MethodType.METHOD_FUNCTION_CALL, false);
+    addPrimitive(vm, vm.fnClass, "call(_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_)", &fn_call16, MethodType.METHOD_FUNCTION_CALL, false);
+    addPrimitive(vm, vm.fnClass, "toString", &fn_toString, MethodType.METHOD_PRIMITIVE, false);
 
     vm.nullClass = AS_CLASS(wrenFindVariable(vm, coreModule, "Null"));
-    registerPrimitives!("Null")(vm, vm.nullClass);
+    addPrimitive(vm, vm.nullClass, "!", &null_not, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.nullClass, "toString", &null_toString, MethodType.METHOD_PRIMITIVE, false);
 
     vm.numClass = AS_CLASS(wrenFindVariable(vm, coreModule, "Num"));
-    registerPrimitives!("Num")(vm, vm.numClass);
+    addPrimitive(vm, vm.numClass, "infinity", &num_infinity, MethodType.METHOD_PRIMITIVE, true);
+    addPrimitive(vm, vm.numClass, "nan", &num_nan, MethodType.METHOD_PRIMITIVE, true);
+    addPrimitive(vm, vm.numClass, "pi", &num_pi, MethodType.METHOD_PRIMITIVE, true);
+    addPrimitive(vm, vm.numClass, "tau", &num_tau, MethodType.METHOD_PRIMITIVE, true);
+    addPrimitive(vm, vm.numClass, "largest", &num_largest, MethodType.METHOD_PRIMITIVE, true);
+    addPrimitive(vm, vm.numClass, "smallest", &num_smallest, MethodType.METHOD_PRIMITIVE, true);
+    addPrimitive(vm, vm.numClass, "maxSafeInteger", &num_maxSafeInteger, MethodType.METHOD_PRIMITIVE, true);
+    addPrimitive(vm, vm.numClass, "minSafeInteger", &num_minSafeInteger, MethodType.METHOD_PRIMITIVE, true);
+    addPrimitive(vm, vm.numClass, "-(_)", &num_minus, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "+(_)", &num_plus, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "*(_)", &num_multiply, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "/(_)", &num_divide, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "<(_)", &num_lt, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, ">(_)", &num_gt, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "<=(_)", &num_lte, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, ">=(_)", &num_gte, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "&(_)", &num_bitwiseAnd, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "|(_)", &num_bitwiseOr, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "^(_)", &num_bitwiseXor, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "<<(_)", &num_bitwiseLeftShift, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, ">>(_)", &num_bitwiseRightShift, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "abs", &num_abs, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "acos", &num_acos, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "asin", &num_asin, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "atan", &num_atan, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "cbrt", &num_cbrt, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "ceil", &num_ceil, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "cos", &num_cos, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "floor", &num_floor, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "round", &num_round, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "sin", &num_sin, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "sqrt", &num_sqrt, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "tan", &num_tan, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "log", &num_log, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "log2", &num_log2, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "exp", &num_exp, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "-", &num_negate, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "%(_)", &num_mod, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "==(_)", &num_eqeq, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "!=(_)", &num_bangeq, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "~", &num_bitwiseNot, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "..(_)", &num_dotDot, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "...(_)", &num_dotDotDot, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "atan2(_)", &num_atan2, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "min(_)", &num_min, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "max(_)", &num_max, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "clamp(_,_)", &num_clamp, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "pow(_)", &num_pow, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "fraction", &num_fraction, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "isInfinity", &num_isInfinity, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "isNan", &num_isNan, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "sign", &num_sign, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "toString", &num_toString, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "truncate", &num_truncate, MethodType.METHOD_PRIMITIVE, false);
 
     vm.stringClass = AS_CLASS(wrenFindVariable(vm, coreModule, "String"));
-    registerPrimitives!("String")(vm, vm.stringClass);
+    addPrimitive(vm, vm.stringClass, "fromCodePoint(_)", &string_fromCodePoint, MethodType.METHOD_PRIMITIVE, true);
+    addPrimitive(vm, vm.stringClass, "fromByte(_)", &string_fromByte, MethodType.METHOD_PRIMITIVE, true);
+    addPrimitive(vm, vm.stringClass, "byteAt(_)", &string_byteAt, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.stringClass, "byteCount", &string_byteCount, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.stringClass, "codePointAt(_)", &string_codePointAt, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.stringClass, "contains(_)", &string_contains, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.stringClass, "endsWith(_)", &string_endsWith, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.stringClass, "indexOf(_)", &string_indexOf1, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.stringClass, "indexOf(_,_)", &string_indexOf2, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.stringClass, "iterate(_)", &string_iterate, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.stringClass, "iterateByte(_)", &string_iterateByte, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.stringClass, "iteratorValue(_)", &string_iteratorValue, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.stringClass, "$", &string_dollar, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.stringClass, "+(_)", &string_plus, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.stringClass, "[_]", &string_subscript, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.stringClass, "toString", &string_toString, MethodType.METHOD_PRIMITIVE, false);
 
     vm.listClass = AS_CLASS(wrenFindVariable(vm, coreModule, "List"));
-    registerPrimitives!("List")(vm, vm.listClass);
+    addPrimitive(vm, vm.listClass, "filled(_,_)", &list_filled, MethodType.METHOD_PRIMITIVE, true);
+    addPrimitive(vm, vm.listClass, "new()", &list_new, MethodType.METHOD_PRIMITIVE, true);
+    addPrimitive(vm, vm.listClass, "[_]", &list_subscript, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.listClass, "[_]=(_)", &list_subscriptSetter, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.listClass, "add(_)", &list_add, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.listClass, "addCore_(_)", &list_addCore, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.listClass, "clear()", &list_clear, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.listClass, "count", &list_count, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.listClass, "insert(_,_)", &list_insert, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.listClass, "iterate(_)", &list_iterate, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.listClass, "iteratorValue(_)", &list_iteratorValue, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.listClass, "removeAt(_)", &list_removeAt, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.listClass, "remove(_)", &list_removeValue, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.listClass, "indexOf(_)", &list_indexOf, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.listClass, "swap(_,_)", &list_swap, MethodType.METHOD_PRIMITIVE, false);
 
     vm.mapClass = AS_CLASS(wrenFindVariable(vm, coreModule, "Map"));
-    registerPrimitives!("Map")(vm, vm.mapClass);
+
+    // TODO: curiously, we have no Map primitives, unlike original Wren
+    //registerPrimitives!("Map")(vm, vm.mapClass);
 
     vm.rangeClass = AS_CLASS(wrenFindVariable(vm, coreModule, "Range"));
-    registerPrimitives!("Range")(vm, vm.rangeClass);
+    addPrimitive(vm, vm.rangeClass, "from", &range_from, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.rangeClass, "to", &range_to, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.rangeClass, "min", &range_min, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.rangeClass, "max", &range_max, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.rangeClass, "isInclusive", &range_isInclusive, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.rangeClass, "iterate(_)", &range_iterate, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.rangeClass, "iteratorValue(_)", &range_iteratorValue, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.rangeClass, "toString", &range_toString, MethodType.METHOD_PRIMITIVE, false);
 
     ObjClass* systemClass = AS_CLASS(wrenFindVariable(vm, coreModule, "System"));
-    registerPrimitives!("System")(vm, systemClass.obj.classObj);
+    addPrimitive(vm, systemClass.obj.classObj, "clock", &system_clock, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, systemClass.obj.classObj, "gc()", &system_gc, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, systemClass.obj.classObj, "writeString_(_)", &system_writeString, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, systemClass.obj.classObj, "isDebugBuild", &system_is_debug_build, MethodType.METHOD_PRIMITIVE, false);
 
 
     // While bootstrapping the core types and running the core module, a number

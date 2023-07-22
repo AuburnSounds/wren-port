@@ -1,6 +1,6 @@
 module wren.primitive;
 import wren.value;
-import wren.vm : WrenVM;
+import wren.vm : WrenVM, Primitive;
 
 nothrow @nogc:
 
@@ -135,25 +135,25 @@ struct WrenPrimitive
     bool registerToSuperClass = false;
 }
 
-template PRIMITIVE(alias name,
-                   alias func,
-                   MethodType methodType = MethodType.METHOD_PRIMITIVE,
-                   bool registerToSuperClass = false)
+// Add a primitive
+void addPrimitive(WrenVM* vm, ObjClass* cls,
+                  string name, // must be zero-terminated!
+                  Primitive func,
+                  MethodType methodType = MethodType.METHOD_PRIMITIVE,
+                  bool registerToSuperClass = false)
 {
     import wren.value : ObjClass, wrenSymbolTableEnsure, wrenBindMethod, Method;
-    void PRIMITIVE(WrenVM* vm, ObjClass* cls) {
-        import core.stdc.string : strlen;
-        int symbol = wrenSymbolTableEnsure(vm,
-            &vm.methodNames, name, strlen(name));
-        Method method;
-        method.type = methodType;
-        method.as.primitive = &func;
 
-        static if (registerToSuperClass) {
-            wrenBindMethod(vm, cls.obj.classObj, symbol, method);
-        } else {
-            wrenBindMethod(vm, cls, symbol, method);
-        }
+    import core.stdc.string : strlen;
+    int symbol = wrenSymbolTableEnsure(vm, &vm.methodNames, name.ptr, strlen(name.ptr));
+    Method method;
+    method.type = methodType;
+    method.as.primitive = func;
+
+    if (registerToSuperClass) {
+        wrenBindMethod(vm, cls.obj.classObj, symbol, method);
+    } else {
+        wrenBindMethod(vm, cls, symbol, method);
     }
 }
 
