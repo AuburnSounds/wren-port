@@ -244,6 +244,10 @@ struct WrenConfiguration
     // If zero, defaults to 50.
     int heapGrowthPercent;
 
+    // Allow trailing semicolons (;) after statements, to ease porting from 
+    // C-family languages. This changes the language grammar.
+    bool acceptsTrailingSemicolons;
+
     // User-defined data associated with the VM.
     void* userData;
 }
@@ -393,6 +397,7 @@ void wrenInitConfiguration(WrenConfiguration* config)
     config.initialHeapSize = 1024 * 1024 * 10;
     config.minHeapSize = 1024 * 1024;
     config.heapGrowthPercent = 50;
+    config.acceptsTrailingSemicolons = false;
     config.userData = null;
 }
 

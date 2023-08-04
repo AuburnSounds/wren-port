@@ -133,8 +133,9 @@ enum TokenType
     TOKEN_ERROR,
     TOKEN_EOF,
 
-    // Wren-extension
-    TOKEN_DOLLAR
+    // Wren-extensions
+    TOKEN_DOLLAR,
+    TOKEN_SEMICOLON
 }
 
 struct Token
@@ -1157,6 +1158,15 @@ void nextToken(Parser* parser)
                 twoCharToken(parser, '=', TokenType.TOKEN_GTEQ, TokenType.TOKEN_GT);
             }
             return;
+
+        case ';':
+            if (parser.vm.config.acceptsTrailingSemicolons)
+            {
+                makeToken(parser, TokenType.TOKEN_SEMICOLON);
+                return;
+            }
+            else
+                goto default;
 
         case '\n':
             makeToken(parser, TokenType.TOKEN_LINE);
@@ -2798,6 +2808,7 @@ static immutable GrammarRule[] rules = [
   /* TOKEN_ERROR         */ UNUSED,
   /* TOKEN_EOF           */ UNUSED,
   /* TOKEN_DOLLAR        */ PREFIX_OPERATOR!("$"),
+  /* TOKEN_SEMICOLON     */ UNUSED,
 ];
 
 // Gets the [GrammarRule] associated with tokens of [type].
@@ -3244,6 +3255,9 @@ void statement(Compiler* compiler)
         expression(compiler);
         emitOp(compiler, Code.CODE_POP);
     }
+
+    // Optional semicolon.
+    match(compiler, TokenType.TOKEN_SEMICOLON);
 }
 
 // Creates a matching constructor method for an initializer with [signature]
@@ -3630,6 +3644,9 @@ void import_(Compiler* compiler)
 
     // Discard the unused result value from calling the module body's closure.
     emitOp(compiler, Code.CODE_POP);
+
+    // Can end here with ;
+    if (match(compiler, TokenType.TOKEN_SEMICOLON)) return;
     
     // The for clause is optional.
     if (!match(compiler, TokenType.TOKEN_FOR)) return;
@@ -3673,6 +3690,9 @@ void import_(Compiler* compiler)
         // Store the result in the variable here.
         defineVariable(compiler, slot);
     } while (match(compiler, TokenType.TOKEN_COMMA));
+
+    // Optional semicolon.
+    match(compiler, TokenType.TOKEN_SEMICOLON);
 }
 
 // Compiles a "var" variable definition statement.
@@ -3698,6 +3718,9 @@ void variableDefinition(Compiler* compiler)
     // Now put it in scope.
     int symbol = declareVariable(compiler, &nameToken);
     defineVariable(compiler, symbol);
+
+    // Optional semicolon.
+    match(compiler, TokenType.TOKEN_SEMICOLON);
 }
 
 // Compiles a "definition". These are the statements that bind new variables.
