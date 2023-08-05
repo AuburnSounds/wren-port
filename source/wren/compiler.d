@@ -3989,7 +3989,7 @@ void addToAttributeGroup(Compiler* compiler, Value group, Value key, Value value
 }
 
 
-// Emit the attributes in the give map onto the stack
+// Emit the attributes in the given map onto the stack
 void emitAttributes(Compiler* compiler, ObjMap* attributes) 
 {
     // Instantiate a new map for the attributes

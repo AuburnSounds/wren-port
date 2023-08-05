@@ -600,6 +600,128 @@ bool list_swap(WrenVM* vm, Value* args) @nogc
 
     return RETURN_NULL(args);
 }
+/++ Map primitives +/
+bool map_new(WrenVM* vm, Value* args) @nogc
+{
+    return RETURN_OBJ(args, wrenNewMap(vm));
+}
+
+bool map_subscript(WrenVM* vm, Value* args) @nogc
+{
+    if (!validateKey(vm, args[1])) return false;
+    ObjMap* map = AS_MAP(args[0]);
+    Value value = wrenMapGet(map, args[1]);
+    if (IS_UNDEFINED(value)) 
+        return RETURN_NULL(args);
+    return RETURN_VAL(args, value);
+}
+
+bool map_subscriptSetter(WrenVM* vm, Value* args) @nogc
+{
+    if (!validateKey(vm, args[1])) return false;
+    wrenMapSet(vm, AS_MAP(args[0]), args[1], args[2]);
+    return RETURN_VAL(args, args[2]);
+}
+
+// Adds an entry to the map and then returns the map itself. This is called by
+// the compiler when compiling map literals instead of using [_]=(_) to
+// minimize stack churn.
+bool map_addCore(WrenVM* vm, Value* args) @nogc
+{
+    if (!validateKey(vm, args[1])) return false;
+
+    wrenMapSet(vm, AS_MAP(args[0]), args[1], args[2]);
+
+    // Return the map itself.
+    return RETURN_VAL(args, args[0]);
+}
+
+bool map_clear(WrenVM* vm, Value* args) @nogc
+{
+    wrenMapClear(vm, AS_MAP(args[0]));
+    return RETURN_NULL(args);
+}
+
+bool map_containsKey(WrenVM* vm, Value* args) @nogc
+{
+    if (!validateKey(vm, args[1])) return false;
+
+    return RETURN_BOOL(args, !IS_UNDEFINED(wrenMapGet(AS_MAP(args[0]), args[1])));
+}
+
+bool map_count(WrenVM* vm, Value* args) @nogc
+{
+    return RETURN_NUM(args, AS_MAP(args[0]).count);
+}
+
+bool map_iterate(WrenVM* vm, Value* args) @nogc
+{
+    ObjMap* map = AS_MAP(args[0]);
+
+    if (map.count == 0) return RETURN_FALSE(args);
+
+    // If we're starting the iteration, start at the first used entry.
+    uint index = 0;
+
+    // Otherwise, start one past the last entry we stopped at.
+    if (!IS_NULL(args[1]))
+    {
+        if (!validateInt(vm, args[1], "Iterator")) return false;
+
+        if (AS_NUM(args[1]) < 0) return RETURN_FALSE(args);
+        index = cast(uint)AS_NUM(args[1]);
+
+        if (index >= map.capacity) return RETURN_FALSE(args);
+
+        // Advance the iterator.
+        index++;
+    }
+
+    // Find a used entry, if any.
+    for (; index < map.capacity; index++)
+    {
+        if (!IS_UNDEFINED(map.entries[index].key)) return RETURN_NUM(args, index);
+    }
+
+    // If we get here, walked all of the entries.
+    return RETURN_FALSE(args);
+}
+
+bool map_remove(WrenVM* vm, Value* args) @nogc
+{
+    if (!validateKey(vm, args[1])) return false;
+    return RETURN_VAL(args, wrenMapRemoveKey(vm, AS_MAP(args[0]), args[1]));
+}
+
+bool map_keyIteratorValue(WrenVM* vm, Value* args) @nogc
+{
+    ObjMap* map = AS_MAP(args[0]);
+    uint index = validateIndex(vm, args[1], map.capacity, "Iterator");
+    if (index == uint.max) return false;
+
+    MapEntry* entry = &map.entries[index];
+    if (IS_UNDEFINED(entry.key))
+    {
+        return RETURN_ERROR(vm, "Invalid map iterator.");
+    }
+    return RETURN_VAL(args, entry.key);
+}
+
+bool map_valueIteratorValue(WrenVM* vm, Value* args) @nogc
+{
+    ObjMap* map = AS_MAP(args[0]);
+    uint index = validateIndex(vm, args[1], map.capacity, "Iterator");
+    if (index == uint.max) return false;
+
+    MapEntry* entry = &map.entries[index];
+    if (IS_UNDEFINED(entry.key))
+    {
+        return RETURN_ERROR(vm, "Invalid map iterator.");
+    }
+
+    return RETURN_VAL(args, entry.value);
+}
+
 /++ Null primitives +/
 @WrenPrimitive("Null", "!")
 bool null_not(WrenVM* vm, Value* args) @nogc
@@ -1689,9 +1811,17 @@ void wrenInitializeCore(WrenVM* vm) @nogc
     addPrimitive(vm, vm.listClass, "swap(_,_)", &list_swap, MethodType.METHOD_PRIMITIVE, false);
 
     vm.mapClass = AS_CLASS(wrenFindVariable(vm, coreModule, "Map"));
-
-    // TODO: curiously, we have no Map primitives, unlike original Wren
-    //registerPrimitives!("Map")(vm, vm.mapClass);
+    addPrimitive(vm, vm.mapClass, "new()", &map_new, MethodType.METHOD_PRIMITIVE, true);
+    addPrimitive(vm, vm.mapClass, "[_]", &map_subscript, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.mapClass, "[_]=(_)", &map_subscriptSetter, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.mapClass, "addCore_(_,_)", &map_addCore, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.mapClass, "clear()", &map_clear, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.mapClass, "containsKey(_)", &map_containsKey, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.mapClass, "count", &map_count, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.mapClass, "remove(_)", &map_remove, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.mapClass, "iterate(_)", &map_iterate, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.mapClass, "keyIteratorValue_(_)", &map_keyIteratorValue, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.mapClass, "valueIteratorValue_(_)", &map_valueIteratorValue, MethodType.METHOD_PRIMITIVE, false);
 
     vm.rangeClass = AS_CLASS(wrenFindVariable(vm, coreModule, "Range"));
     addPrimitive(vm, vm.rangeClass, "from", &range_from, MethodType.METHOD_PRIMITIVE, false);
