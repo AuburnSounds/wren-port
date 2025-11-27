@@ -282,9 +282,9 @@ unittest
 
 /// C-locale independent string to integer parsing.
 /// Params:
-///     s Must be a zero-terminated string.
-///     mustConsumeEntireInput if true, check that s is entirely consumed by parsing the number.
-///     err: optional bool
+///     s = Must be a zero-terminated string.
+///     mustConsumeEntireInput = if true, check that s is entirely consumed by parsing the number.
+///     err = optional bool
 /// Note: unlike with `convertStringToDouble`, the string "4.7" will parse to just 4. Replaces %d in scanf-like functions.
 /// Only parse correctly from -2147483648 to 2147483647.
 /// Larger values are clamped to this -2147483648 to 2147483647 range.
@@ -340,9 +340,9 @@ unittest
 
 /// C-locale independent string to float parsing.
 /// Params:
-///     s Must be a zero-terminated string.
-///     mustConsumeEntireInput if true, check that s is entirely consumed by parsing the number.
-///     err: optional bool
+///     s = Must be a zero-terminated string.
+///     mustConsumeEntireInput = if true, check that s is entirely consumed by parsing the number.
+///     err = optional bool
 public double convertStringToDouble(const(char)* s, 
                                     bool mustConsumeEntireInput,
                                     bool* err) pure nothrow @nogc
