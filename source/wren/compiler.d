@@ -6,6 +6,11 @@ import wren.utils;
 import wren.value;
 import wren.vm;
 
+version(LDC)
+    import ldc.attributes: optStrategy;
+else
+    private struct optStrategy { string strategy; }
+
 nothrow @nogc:
 // This is written in bottom-up order, so the tokenization comes first, then
 // parsing/code generation. This minimizes the number of explicit forward
@@ -3990,6 +3995,7 @@ void addToAttributeGroup(Compiler* compiler, Value group, Value key, Value value
 
 
 // Emit the attributes in the given map onto the stack
+@optStrategy("minsize") // else it balloons to 10kb codegen
 void emitAttributes(Compiler* compiler, ObjMap* attributes) 
 {
     // Instantiate a new map for the attributes

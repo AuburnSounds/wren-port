@@ -4,6 +4,11 @@ import wren.primitive;
 import wren.value;
 import wren.vm;
 
+version(LDC)
+    import ldc.attributes: optStrategy;
+else
+    private struct optStrategy { string strategy; }
+
 nothrow @nogc:
 
 // The core module source that is interpreted whenever core is initialized.
@@ -1607,7 +1612,7 @@ ObjClass* defineClass(WrenVM* vm, ObjModule* module_, const(char)* name) @nogc
   return classObj;
 }
 
-
+@optStrategy("minsize") // else it balloons to 24kb codegen (here 7.7kb instead)
 void wrenInitializeCore(WrenVM* vm) @nogc
 {
     ObjModule* coreModule = wrenNewModule(vm, null);
