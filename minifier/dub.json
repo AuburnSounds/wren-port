@@ -1,0 +1,18 @@
+{
+    "name": "wren-minifier",
+    "description": "Wren source code minifier. Entirely vibe-coded. Use with caution.",
+    "license": "BSL-1.0",
+    "targetType": "executable",
+    "sourcePaths": ["source"],
+    "mainSourceFile": "source/main.d",
+    "configurations": [
+        {
+            "name": "application",
+            "mainSourceFile": "source/main.d"
+        },
+        {
+            "name": "unittest",
+            "mainSourceFile": "source/main.d"
+        }
+    ]
+}
