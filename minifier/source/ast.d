@@ -22,6 +22,7 @@ class ClassDecl : Node
     string       name;
     string       superclass; // "" if none
     MethodDecl[] methods;
+    bool         isForeign;
 }
 
 enum MethodKind
@@ -35,8 +36,10 @@ enum MethodKind
     construct,       // construct name(params) { }
     static_,         // static name(params) { }
     staticGetter,    // static name { }
-    foreign_,        // foreign name(params)
-    foreignStatic,   // foreign static name(params)
+    foreign_,             // foreign name(params)
+    foreignStatic,        // foreign static name(params)
+    foreignGetter,        // foreign name
+    foreignStaticGetter,  // foreign static name
 }
 
 class MethodDecl : Node

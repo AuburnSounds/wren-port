@@ -27,6 +27,7 @@ private void printNode(ref Appender!string buf, Node n)
 
 private void printClass(ref Appender!string buf, ClassDecl cd)
 {
+    if (cd.isForeign) buf.put("foreign ");
     buf.put("class "); buf.put(cd.name);
     if (cd.superclass.length) { buf.put(" is "); buf.put(cd.superclass); }
     buf.put('{');
@@ -59,6 +60,10 @@ private void printMethod(ref Appender!string buf, MethodDecl m)
         case foreignStatic:
             buf.put("foreign static "); buf.put(m.name);
             printParams(buf, m.params); return;
+        case foreignGetter:
+            buf.put("foreign "); buf.put(m.name); return;
+        case foreignStaticGetter:
+            buf.put("foreign static "); buf.put(m.name); return;
         case construct:
             buf.put("construct "); buf.put(m.name);
             printParams(buf, m.params);
@@ -157,6 +162,50 @@ private void printFor(ref Appender!string buf, ForStmt s)
     printStmt(buf, s.body);
 }
 
+private int binaryOpBP(string op) pure nothrow
+{
+    switch (op)
+    {
+        case "||":              return  3;
+        case "&&":              return  4;
+        case "==": case "!=":   return  5;
+        case "is":              return  6;
+        case "<":  case ">":
+        case "<=": case ">=":   return  7;
+        case "|":               return  8;
+        case "^":               return  9;
+        case "&":               return 10;
+        case "<<": case ">>":   return 11;
+        case "..": case "...":  return 12;
+        case "+":  case "-":    return 13;
+        case "*":  case "/":
+        case "%":               return 14;
+        default:                return  0;
+    }
+}
+
+// Returns the binding power of an expression's outermost operator.
+// Atoms (literals, calls, etc.) return a high value — they never need parens.
+private int exprBP(Expr e) pure nothrow
+{
+    if (auto b = cast(BinaryExpr)  e) return binaryOpBP(b.op);
+    if (cast(TernaryExpr) e !is null) return 2;
+    if (cast(AssignExpr)  e !is null) return 1;
+    if (cast(RangeExpr)   e !is null) return 12;
+    return 100;
+}
+
+// Print e as a child of a binary operator with binding power parentBP.
+// isRight: true for the right operand (left-assoc means equal bp also needs parens).
+private void printOperand(ref Appender!string buf, Expr e, int parentBP, bool isRight)
+{
+    int bp = exprBP(e);
+    bool needsParens = isRight ? (bp <= parentBP) : (bp < parentBP);
+    if (needsParens) buf.put('(');
+    printExpr(buf, e);
+    if (needsParens) buf.put(')');
+}
+
 private void printExpr(ref Appender!string buf, Expr e)
 {
     if (e is null) return;
@@ -179,13 +228,13 @@ private void printExpr(ref Appender!string buf, Expr e)
 
     if (auto b = cast(BinaryExpr) e)
     {
-        // Add spaces around word operators to prevent token merging
         bool wordOp = (b.op == "is");
-        printExpr(buf, b.left);
+        int bp = binaryOpBP(b.op);
+        printOperand(buf, b.left,  bp, false);
         if (wordOp) buf.put(' ');
         buf.put(b.op);
         if (wordOp) buf.put(' ');
-        printExpr(buf, b.right);
+        printOperand(buf, b.right, bp, true);
         return;
     }
 

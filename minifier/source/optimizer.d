@@ -11,9 +11,14 @@ void optimizeModule(WrenModule mod)
 {
     foreach (item; mod.items)
         if (auto cd = cast(ClassDecl) item)
+        {
+            bool[string] methodNames;
+            foreach (m; cd.methods) methodNames[m.name] = true;
+
             foreach (m; cd.methods)
                 if (m.body !is null)
-                    optimizeBody(m.body, m.params, null, null);
+                    optimizeBody(m.body, m.params, null, null, methodNames);
+        }
 }
 
 // ── Body optimizer ────────────────────────────────────────────────────────────
@@ -21,7 +26,8 @@ void optimizeModule(WrenModule mod)
 private void optimizeBody(BlockStmt body_,
                           string[]             methodParams,
                           LiteralExpr[string]  outerConsts,
-                          string[string]       outerRenames)
+                          string[string]       outerRenames,
+                          bool[string]         forbidden = null)
 {
     // Pass 1 — constant collection
     LiteralExpr[string] consts;
@@ -61,7 +67,8 @@ private void optimizeBody(BlockStmt body_,
     if (outerRenames !is null)
         foreach (k, v; outerRenames) renames[k] = v;
 
-    auto alloc = NameAllocator();
+    NameAllocator alloc;
+    alloc.forbidden = forbidden;
 
     // Rename params first (in order)
     foreach (ref p; methodParams)
@@ -283,6 +290,7 @@ private bool shouldRename(string name) pure nothrow
 private struct NameAllocator
 {
     int counter = 0;
+    bool[string] forbidden;
 
     private static immutable string[] reserved = [
         "as","break","class","construct","continue","else","false",
@@ -297,6 +305,7 @@ private struct NameAllocator
             string name = indexToName(counter++);
             bool ok = true;
             foreach (r; reserved) if (r == name) { ok = false; break; }
+            if (ok && (name in forbidden)) ok = false;
             if (ok) return name;
         }
     }

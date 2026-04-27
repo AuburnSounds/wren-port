@@ -5,7 +5,7 @@
 
 The original Wren implementation is [here](https://github.com/wren-lang).
 
-This implementation comes with a Wren minifiern it does constant-folding and locals renaming.
+This implementation comes with a Wren minifier: it does constant-folding and locals renaming.
 
 ## Changes from original
 

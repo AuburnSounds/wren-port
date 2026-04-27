@@ -47,9 +47,14 @@ private Node parseTopLevel(ref Parser p)
 {
     switch (p.cur.kind) with (Tok)
     {
-        case kwImport: return parseImport(p);
-        case kwClass:  return parseClass(p);
-        default:       return parseStatement(p);
+        case kwImport:  return parseImport(p);
+        case kwClass:   return parseClass(p);
+        case kwForeign:
+            p.consume();
+            auto cd = parseClass(p);
+            cd.isForeign = true;
+            return cd;
+        default:        return parseStatement(p);
     }
 }
 
@@ -176,7 +181,8 @@ private MethodDecl parseMethod(ref Parser p)
     }
     else
     {
-        m.kind = isStatic ? MethodKind.staticGetter : MethodKind.getter;
+        m.kind = isForeign ? (isStatic ? MethodKind.foreignStaticGetter : MethodKind.foreignGetter)
+                           : (isStatic ? MethodKind.staticGetter         : MethodKind.getter);
     }
 
     if (!isForeign) m.body = parseBlock(p); else p.consumeNewline();
