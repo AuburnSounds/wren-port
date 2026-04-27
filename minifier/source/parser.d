@@ -212,6 +212,7 @@ private Node parseStatement(ref Parser p)
     switch (p.cur.kind) with (Tok)
     {
         case kwVar:      return parseVarDecl(p);
+        case kwImport:   return parseImport(p);
         case kwIf:       return parseIf(p);
         case kwWhile:    return parseWhile(p);
         case kwFor:      return parseFor(p);
@@ -228,8 +229,7 @@ private VarDecl parseVarDecl(ref Parser p)
     p.expect(Tok.kwVar);
     auto d = new VarDecl();
     d.name = p.expect(Tok.ident).text;
-    p.expect(Tok.eq);
-    d.init = parseExpr(p);
+    if (p.cur.kind == Tok.eq) { p.consume(); d.init = parseExpr(p); }
     p.consumeNewline();
     return d;
 }

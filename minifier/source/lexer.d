@@ -85,7 +85,8 @@ Token[] tokenize(string src)
         while (look < src.length && (src[look] == ' ' || src[look] == '\t' ||
                                      src[look] == '\r' || src[look] == '\n'))
             look++;
-        if (look < src.length && src[look] == '.') return;
+        if (look < src.length && src[look] == '.' &&
+            (look + 1 >= src.length || src[look + 1] != '.')) return;
         emit(Tok.newline, "\n", line, col);
     }
 

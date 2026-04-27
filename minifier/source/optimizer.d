@@ -4,6 +4,7 @@ import ast;
 import std.conv   : to, ConvException;
 import std.format : format;
 import std.math   : floor, isInfinity, isNaN;
+import std.ascii  : isAlpha, isAlphaNum;
 
 // ── Public entry point ────────────────────────────────────────────────────────
 
@@ -19,6 +20,74 @@ void optimizeModule(WrenModule mod)
                 if (m.body !is null)
                     optimizeBody(m.body, m.params, null, null, methodNames);
         }
+}
+
+// ── String-interpolation identifier scanner ───────────────────────────────────
+// Variable names used inside %(…) in string literals must not be renamed because
+// the literal text is opaque to the renamer.
+
+private void collectInterpIdents(string raw, ref bool[string] result)
+{
+    size_t i = 0;
+    while (i + 1 < raw.length)
+    {
+        if (raw[i] == '%' && raw[i + 1] == '(')
+        {
+            i += 2;
+            int depth = 1;
+            while (i < raw.length && depth > 0)
+            {
+                char ch = raw[i];
+                if      (ch == '(') { depth++; i++; }
+                else if (ch == ')') { depth--; i++; }
+                else if (isAlpha(ch) || ch == '_')
+                {
+                    size_t s = i;
+                    while (i < raw.length && (isAlphaNum(raw[i]) || raw[i] == '_')) i++;
+                    result[raw[s .. i]] = true;
+                }
+                else i++;
+            }
+        }
+        else i++;
+    }
+}
+
+private void scanNodeForInterpIdents(Node n, ref bool[string] result)
+{
+    if (n is null) return;
+    if (auto blk = cast(BlockStmt)  n) { foreach (s; blk.stmts)   scanNodeForInterpIdents(s, result); return; }
+    if (auto es  = cast(ExprStmt)   n) { scanExprForInterpIdents(es.expr,  result); return; }
+    if (auto rs  = cast(ReturnStmt) n) { scanExprForInterpIdents(rs.value, result); return; }
+    if (auto vd  = cast(VarDecl)    n) { scanExprForInterpIdents(vd.init,  result); return; }
+    if (auto ifs = cast(IfStmt)     n)
+    {
+        scanExprForInterpIdents(ifs.cond, result);
+        scanNodeForInterpIdents(ifs.then_, result);
+        scanNodeForInterpIdents(ifs.else_, result);
+        return;
+    }
+    if (auto ws = cast(WhileStmt) n) { scanExprForInterpIdents(ws.cond, result); scanNodeForInterpIdents(ws.body, result); return; }
+    if (auto fs = cast(ForStmt)   n) { scanExprForInterpIdents(fs.seq,  result); scanNodeForInterpIdents(fs.body, result); return; }
+}
+
+private void scanExprForInterpIdents(Expr e, ref bool[string] result)
+{
+    if (e is null) return;
+    if (auto lit = cast(LiteralExpr)          e) { if (lit.kind == LiteralExpr.Kind.string_) collectInterpIdents(lit.raw, result); return; }
+    if (auto b   = cast(BinaryExpr)           e) { scanExprForInterpIdents(b.left, result); scanExprForInterpIdents(b.right, result); return; }
+    if (auto u   = cast(UnaryExpr)            e) { scanExprForInterpIdents(u.operand, result); return; }
+    if (auto a   = cast(AssignExpr)           e) { scanExprForInterpIdents(a.value, result); return; }
+    if (auto c   = cast(CallExpr)             e) { scanExprForInterpIdents(c.receiver, result); foreach (arg; c.args) scanExprForInterpIdents(arg, result); return; }
+    if (auto se  = cast(SetterExpr)           e) { scanExprForInterpIdents(se.receiver, result); scanExprForInterpIdents(se.value, result); return; }
+    if (auto sub = cast(SubscriptExpr)        e) { scanExprForInterpIdents(sub.receiver, result); foreach (idx; sub.indices) scanExprForInterpIdents(idx, result); return; }
+    if (auto sub = cast(SubscriptAssignExpr)  e) { scanExprForInterpIdents(sub.receiver, result); foreach (idx; sub.indices) scanExprForInterpIdents(idx, result); scanExprForInterpIdents(sub.value, result); return; }
+    if (auto t   = cast(TernaryExpr)          e) { scanExprForInterpIdents(t.cond, result); scanExprForInterpIdents(t.then_, result); scanExprForInterpIdents(t.else_, result); return; }
+    if (auto r   = cast(RangeExpr)            e) { scanExprForInterpIdents(r.from, result); scanExprForInterpIdents(r.to, result); return; }
+    if (auto le  = cast(ListExpr)             e) { foreach (el; le.elements) scanExprForInterpIdents(el, result); return; }
+    if (auto me  = cast(MapExpr)              e) { foreach (k; me.keys) scanExprForInterpIdents(k, result); foreach (v; me.values) scanExprForInterpIdents(v, result); return; }
+    if (auto be  = cast(BlockExpr)            e) { scanNodeForInterpIdents(be.body, result); return; }
+    if (auto se  = cast(SuperExpr)            e) { foreach (a; se.args) scanExprForInterpIdents(a, result); return; }
 }
 
 // ── Body optimizer ────────────────────────────────────────────────────────────
@@ -70,10 +139,20 @@ private void optimizeBody(BlockStmt body_,
     NameAllocator alloc;
     alloc.forbidden = forbidden;
 
+    // Identifiers used inside %(…) string interpolations must keep their original
+    // names — the literal text is opaque to the renamer and cannot be updated.
+    bool[string] interpIdents;
+    scanNodeForInterpIdents(body_, interpIdents);
+    foreach (k; interpIdents.byKey)
+    {
+        if (shouldRename(k)) renames[k] = k; // identity mapping: k stays as k
+        alloc.forbidden[k] = true;           // don't assign k as a short name for others
+    }
+
     // Rename params first (in order)
     foreach (ref p; methodParams)
     {
-        if (!shouldRename(p)) continue;
+        if (!shouldRename(p) || p in renames) continue; // skip interp-protected names
         string n = alloc.next();
         renames[p] = n;
         p = n;
@@ -89,6 +168,8 @@ private void optimizeBody(BlockStmt body_,
             }
 
     // Collect ForStmt loop variables and assign short names
+    // Forward-declare as a delegate to allow mutual recursion with collectForVars.
+    void delegate(Expr) collectForVarsExpr;
     void collectForVars(Node n)
     {
         if (auto blk = cast(BlockStmt) n) { foreach (s; blk.stmts) collectForVars(s); return; }
@@ -101,11 +182,29 @@ private void optimizeBody(BlockStmt body_,
         }
         if (auto ifs = cast(IfStmt)   n) { collectForVars(ifs.then_); if (ifs.else_) collectForVars(ifs.else_); return; }
         if (auto ws  = cast(WhileStmt) n) { collectForVars(ws.body); return; }
+        if (auto es  = cast(ExprStmt)  n) { collectForVarsExpr(es.expr); return; }
     }
+    collectForVarsExpr = delegate(Expr e)
+    {
+        if (e is null) return;
+        if (auto be  = cast(BlockExpr)           e) { collectForVars(be.body); return; }
+        if (auto c   = cast(CallExpr)            e) { collectForVarsExpr(c.receiver); foreach (a; c.args) collectForVarsExpr(a); return; }
+        if (auto b   = cast(BinaryExpr)          e) { collectForVarsExpr(b.left); collectForVarsExpr(b.right); return; }
+        if (auto u   = cast(UnaryExpr)           e) { collectForVarsExpr(u.operand); return; }
+        if (auto a   = cast(AssignExpr)          e) { collectForVarsExpr(a.value); return; }
+        if (auto se  = cast(SetterExpr)          e) { collectForVarsExpr(se.receiver); collectForVarsExpr(se.value); return; }
+        if (auto sub = cast(SubscriptExpr)       e) { collectForVarsExpr(sub.receiver); foreach (i; sub.indices) collectForVarsExpr(i); return; }
+        if (auto sub = cast(SubscriptAssignExpr) e) { collectForVarsExpr(sub.receiver); foreach (i; sub.indices) collectForVarsExpr(i); collectForVarsExpr(sub.value); return; }
+        if (auto t   = cast(TernaryExpr)         e) { collectForVarsExpr(t.cond); collectForVarsExpr(t.then_); collectForVarsExpr(t.else_); return; }
+        if (auto r   = cast(RangeExpr)           e) { collectForVarsExpr(r.from); collectForVarsExpr(r.to); return; }
+        if (auto le  = cast(ListExpr)            e) { foreach (el; le.elements) collectForVarsExpr(el); return; }
+        if (auto me  = cast(MapExpr)             e) { foreach (k; me.keys) collectForVarsExpr(k); foreach (v; me.values) collectForVarsExpr(v); return; }
+        if (auto se  = cast(SuperExpr)           e) { foreach (a; se.args) collectForVarsExpr(a); return; }
+    };
     collectForVars(body_);
 
     // Apply renames throughout body
-    foreach (ref s; body_.stmts) s = renameStmt(s, renames);
+    foreach (ref s; body_.stmts) s = renameStmt(s, renames, alloc);
 }
 
 // ── Pass 1 helpers ────────────────────────────────────────────────────────────
@@ -263,9 +362,7 @@ private Expr tryFoldArith(BinaryExpr b)
         case "-": result = lv - rv; break;
         case "*": result = lv * rv; break;
         case "/":
-            if (rv == 0.0)
-                throw new Exception(
-                    format("Constant folding: division by zero (%s / %s)", lLit.raw, rLit.raw));
+            if (rv == 0.0) return b;
             result = lv / rv;
             break;
         default: return b;
@@ -321,55 +418,82 @@ private struct NameAllocator
     }
 }
 
-private Node renameStmt(Node s, string[string] renames)
+private Node renameStmt(Node s, string[string] renames, ref NameAllocator alloc)
 {
-    if (auto es  = cast(ExprStmt)   s) { es.expr   = renameExpr(es.expr,   renames); return es; }
-    if (auto rs  = cast(ReturnStmt) s) { if (rs.value) rs.value = renameExpr(rs.value, renames); return rs; }
-    if (auto vd  = cast(VarDecl)    s) { vd.init   = renameExpr(vd.init,   renames); return vd; }
+    if (auto es  = cast(ExprStmt)   s) { es.expr   = renameExpr(es.expr,   renames, alloc); return es; }
+    if (auto rs  = cast(ReturnStmt) s) { if (rs.value) rs.value = renameExpr(rs.value, renames, alloc); return rs; }
+    if (auto vd  = cast(VarDecl)    s) { vd.init   = renameExpr(vd.init,   renames, alloc); return vd; }
     if (auto ifs = cast(IfStmt)     s)
     {
-        ifs.cond  = renameExpr(ifs.cond, renames);
-        ifs.then_ = renameStmt(ifs.then_, renames);
-        if (ifs.else_ !is null) ifs.else_ = renameStmt(ifs.else_, renames);
+        ifs.cond  = renameExpr(ifs.cond, renames, alloc);
+        ifs.then_ = renameStmt(ifs.then_, renames, alloc);
+        if (ifs.else_ !is null) ifs.else_ = renameStmt(ifs.else_, renames, alloc);
         return ifs;
     }
-    if (auto ws = cast(WhileStmt)  s) { ws.cond = renameExpr(ws.cond, renames); ws.body = renameStmt(ws.body, renames); return ws; }
+    if (auto ws = cast(WhileStmt)  s) { ws.cond = renameExpr(ws.cond, renames, alloc); ws.body = renameStmt(ws.body, renames, alloc); return ws; }
     if (auto fs = cast(ForStmt)    s)
     {
-        fs.seq = renameExpr(fs.seq, renames);
+        fs.seq = renameExpr(fs.seq, renames, alloc);
         if (shouldRename(fs.loopVar))
             if (auto r = fs.loopVar in renames) fs.loopVar = *r;
-        fs.body = renameStmt(fs.body, renames);
+        fs.body = renameStmt(fs.body, renames, alloc);
         return fs;
     }
-    if (auto blk = cast(BlockStmt) s) { foreach (ref inner; blk.stmts) inner = renameStmt(inner, renames); return blk; }
+    if (auto blk = cast(BlockStmt) s)
+    {
+        // Each nested block gets its own scope: vars declared here that shadow
+        // an outer rename receive a fresh short name, processed in declaration
+        // order so init expressions see the outer binding, not the inner one.
+        string[string] local = renames.dup;
+        foreach (ref inner; blk.stmts)
+        {
+            if (auto vd2 = cast(VarDecl) inner)
+            {
+                vd2.init = renameExpr(vd2.init, local, alloc);
+                if (shouldRename(vd2.name))
+                {
+                    string n2 = alloc.next();
+                    local[vd2.name] = n2;
+                    vd2.name = n2;
+                }
+            }
+            else inner = renameStmt(inner, local, alloc);
+        }
+        return blk;
+    }
     return s;
 }
 
-private Expr renameExpr(Expr e, string[string] renames)
+private Expr renameExpr(Expr e, string[string] renames, ref NameAllocator alloc)
 {
     if (e is null) return e;
     if (auto id  = cast(IdentExpr)           e) { if (auto r = id.name in renames) id.name = *r; return id; }
-    if (auto a   = cast(AssignExpr)          e) { if (auto r = a.name  in renames) a.name  = *r; a.value = renameExpr(a.value, renames); return a; }
-    if (auto b   = cast(BinaryExpr)          e) { b.left = renameExpr(b.left, renames); b.right = renameExpr(b.right, renames); return b; }
-    if (auto u   = cast(UnaryExpr)           e) { u.operand = renameExpr(u.operand, renames); return e; }
-    if (auto c   = cast(CallExpr)            e) { if (c.receiver) c.receiver = renameExpr(c.receiver, renames); foreach (ref arg; c.args) arg = renameExpr(arg, renames); return e; }
-    if (auto se  = cast(SetterExpr)          e) { se.receiver = renameExpr(se.receiver, renames); se.value = renameExpr(se.value, renames); return e; }
-    if (auto sub = cast(SubscriptExpr)       e) { sub.receiver = renameExpr(sub.receiver, renames); foreach (ref i; sub.indices) i = renameExpr(i, renames); return e; }
-    if (auto sub = cast(SubscriptAssignExpr) e) { sub.receiver = renameExpr(sub.receiver, renames); foreach (ref i; sub.indices) i = renameExpr(i, renames); sub.value = renameExpr(sub.value, renames); return e; }
-    if (auto t   = cast(TernaryExpr)         e) { t.cond = renameExpr(t.cond, renames); t.then_ = renameExpr(t.then_, renames); t.else_ = renameExpr(t.else_, renames); return e; }
-    if (auto r   = cast(RangeExpr)           e) { r.from = renameExpr(r.from, renames); r.to = renameExpr(r.to, renames); return e; }
-    if (auto le  = cast(ListExpr)            e) { foreach (ref el; le.elements) el = renameExpr(el, renames); return e; }
-    if (auto me  = cast(MapExpr)             e) { foreach (ref k; me.keys) k = renameExpr(k, renames); foreach (ref v; me.values) v = renameExpr(v, renames); return e; }
+    if (auto a   = cast(AssignExpr)          e) { if (auto r = a.name  in renames) a.name  = *r; a.value = renameExpr(a.value, renames, alloc); return a; }
+    if (auto b   = cast(BinaryExpr)          e) { b.left = renameExpr(b.left, renames, alloc); b.right = renameExpr(b.right, renames, alloc); return b; }
+    if (auto u   = cast(UnaryExpr)           e) { u.operand = renameExpr(u.operand, renames, alloc); return e; }
+    if (auto c   = cast(CallExpr)            e) { if (c.receiver) c.receiver = renameExpr(c.receiver, renames, alloc); foreach (ref arg; c.args) arg = renameExpr(arg, renames, alloc); return e; }
+    if (auto se  = cast(SetterExpr)          e) { se.receiver = renameExpr(se.receiver, renames, alloc); se.value = renameExpr(se.value, renames, alloc); return e; }
+    if (auto sub = cast(SubscriptExpr)       e) { sub.receiver = renameExpr(sub.receiver, renames, alloc); foreach (ref i; sub.indices) i = renameExpr(i, renames, alloc); return e; }
+    if (auto sub = cast(SubscriptAssignExpr) e) { sub.receiver = renameExpr(sub.receiver, renames, alloc); foreach (ref i; sub.indices) i = renameExpr(i, renames, alloc); sub.value = renameExpr(sub.value, renames, alloc); return e; }
+    if (auto t   = cast(TernaryExpr)         e) { t.cond = renameExpr(t.cond, renames, alloc); t.then_ = renameExpr(t.then_, renames, alloc); t.else_ = renameExpr(t.else_, renames, alloc); return e; }
+    if (auto r   = cast(RangeExpr)           e) { r.from = renameExpr(r.from, renames, alloc); r.to = renameExpr(r.to, renames, alloc); return e; }
+    if (auto le  = cast(ListExpr)            e) { foreach (ref el; le.elements) el = renameExpr(el, renames, alloc); return e; }
+    if (auto me  = cast(MapExpr)             e) { foreach (ref k; me.keys) k = renameExpr(k, renames, alloc); foreach (ref v; me.values) v = renameExpr(v, renames, alloc); return e; }
     if (auto be  = cast(BlockExpr)           e)
     {
-        // Closure params: rename if they shadow outer vars; otherwise keep outer renames
+        string[string] local = renames.dup;
         foreach (ref p; be.params)
-            if (auto r = p in renames) p = *r;
-        foreach (ref s; be.body.stmts) s = renameStmt(s, renames);
+        {
+            if (!shouldRename(p)) continue;
+            if (p in local && local[p] == p) continue; // interp-protected: must keep name
+            string n = alloc.next();
+            local[p] = n;
+            p = n;
+        }
+        be.body = cast(BlockStmt) renameStmt(be.body, local, alloc);
         return e;
     }
-    if (auto se  = cast(SuperExpr)           e) { foreach (ref a; se.args) a = renameExpr(a, renames); return e; }
+    if (auto se  = cast(SuperExpr)           e) { foreach (ref a; se.args) a = renameExpr(a, renames, alloc); return e; }
     return e;
 }
 

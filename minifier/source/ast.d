@@ -54,7 +54,7 @@ class MethodDecl : Node
 class VarDecl : Node
 {
     string name;
-    Expr   init; // always present (Wren requires initialiser)
+    Expr   init; // null when declared without initialiser (e.g. `var x`)
 }
 
 class BlockStmt : Node

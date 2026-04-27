@@ -2,6 +2,7 @@ module printer;
 
 import ast;
 import std.array : Appender;
+import std.ascii : isAlphaNum;
 
 string printModule(WrenModule mod)
 {
@@ -121,6 +122,7 @@ private void printBlock(ref Appender!string buf, BlockStmt b)
 private void printStmt(ref Appender!string buf, Node s)
 {
     if (auto vd  = cast(VarDecl)    s) { printVarDecl(buf, vd); return; }
+    if (auto imp = cast(ImportDecl) s) { printImport(buf, imp); return; }
     if (auto es  = cast(ExprStmt)   s) { printExpr(buf, es.expr); return; }
     if (auto rs  = cast(ReturnStmt) s)
     {
@@ -138,15 +140,22 @@ private void printStmt(ref Appender!string buf, Node s)
 
 private void printVarDecl(ref Appender!string buf, VarDecl vd)
 {
-    buf.put("var "); buf.put(vd.name); buf.put('=');
-    printExpr(buf, vd.init);
+    buf.put("var "); buf.put(vd.name);
+    if (vd.init !is null) { buf.put('='); printExpr(buf, vd.init); }
 }
 
 private void printIf(ref Appender!string buf, IfStmt s)
 {
     buf.put("if("); printExpr(buf, s.cond); buf.put(')');
     printStmt(buf, s.then_);
-    if (s.else_ !is null) { buf.put("else "); printStmt(buf, s.else_); }
+    if (s.else_ !is null)
+    {
+        char last = buf.data.length ? buf.data[$ - 1] : '\0';
+        if (last.isAlphaNum || last == '_') buf.put(' ');
+        bool elseIsBlock = cast(BlockStmt) s.else_ !is null;
+        buf.put(elseIsBlock ? "else" : "else ");
+        printStmt(buf, s.else_);
+    }
 }
 
 private void printWhile(ref Appender!string buf, WhileStmt s)
@@ -192,6 +201,7 @@ private int exprBP(Expr e) pure nothrow
     if (cast(TernaryExpr) e !is null) return 2;
     if (cast(AssignExpr)  e !is null) return 1;
     if (cast(RangeExpr)   e !is null) return 12;
+    if (cast(UnaryExpr)   e !is null) return 15;
     return 100;
 }
 
@@ -224,7 +234,14 @@ private void printExpr(ref Appender!string buf, Expr e)
     }
 
     if (auto u = cast(UnaryExpr) e)
-    { buf.put(u.op); printExpr(buf, u.operand); return; }
+    {
+        buf.put(u.op);
+        bool needsParens = exprBP(u.operand) < 15;
+        if (needsParens) buf.put('(');
+        printExpr(buf, u.operand);
+        if (needsParens) buf.put(')');
+        return;
+    }
 
     if (auto b = cast(BinaryExpr) e)
     {
@@ -291,7 +308,7 @@ private void printExpr(ref Appender!string buf, Expr e)
     { printExpr(buf, t.cond); buf.put('?'); printExpr(buf, t.then_); buf.put(':'); printExpr(buf, t.else_); return; }
 
     if (auto r = cast(RangeExpr) e)
-    { printExpr(buf, r.from); buf.put(r.inclusive ? ".." : "..."); printExpr(buf, r.to); return; }
+    { printOperand(buf, r.from, 12, false); buf.put(r.inclusive ? ".." : "..."); printOperand(buf, r.to, 12, true); return; }
 
     if (auto le = cast(ListExpr) e)
     { buf.put('['); foreach (i, el; le.elements) { if (i) buf.put(','); printExpr(buf, el); } buf.put(']'); return; }
@@ -299,7 +316,7 @@ private void printExpr(ref Appender!string buf, Expr e)
     if (auto me = cast(MapExpr) e)
     {
         buf.put('{');
-        foreach (i, k; me.keys) { if (i) buf.put(','); printExpr(buf, k); buf.put(':'); printExpr(buf, me.values[i]); }
+        foreach (i, k; me.keys) { if (i) buf.put(','); printMapKey(buf, k); buf.put(':'); printExpr(buf, me.values[i]); }
         buf.put('}'); return;
     }
 
@@ -311,6 +328,19 @@ private void printExpr(ref Appender!string buf, Expr e)
 private void printReceiver(ref Appender!string buf, Expr e)
 {
     bool needsParens = cast(UnaryExpr)   e !is null
+                    || cast(BinaryExpr)  e !is null
+                    || cast(TernaryExpr) e !is null
+                    || cast(AssignExpr)  e !is null;
+    if (needsParens) buf.put('(');
+    printExpr(buf, e);
+    if (needsParens) buf.put(')');
+}
+
+// Map keys are parsed by the Wren runtime at a restricted precedence that
+// excludes range and binary operators — wrap those in parens.
+private void printMapKey(ref Appender!string buf, Expr e)
+{
+    bool needsParens = cast(RangeExpr)   e !is null
                     || cast(BinaryExpr)  e !is null
                     || cast(TernaryExpr) e !is null
                     || cast(AssignExpr)  e !is null;
