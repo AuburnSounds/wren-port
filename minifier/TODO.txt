@@ -1,0 +1,36 @@
+Assessment from Claude:
+
+"""
+Remaining correctness risks:
+
+  1. Import alias variables (medium risk): import "foo" for Bar as baz inside a method
+  body — baz never enters the rename map and isn't added to forbidden. A later local var
+  could be renamed to baz, creating a silent collision. This is rare but real.
+  2. String interpolation scanner is heuristic (low-medium risk): collectInterpIdents
+  tokenizes the raw string by scanning for alphanumeric runs inside %(...). It
+  over-protects (method names get protected unnecessarily) but the correctness risk is
+  the opposite: if a complex expression like "%(a.b.c)" leads to a, b, c all being
+  frozen, some renames are missed. Not wrong output, just suboptimal — unless a fresh
+  short name happens to be one of the unnecessarily-protected names. The alloc.forbidden
+  prevents that, so this is safe.
+  3. Closure-captured variables in constant folding (low risk): the foldStmt for
+  BlockExpr removes closure params from the inner consts map, but the VarDecl elimination
+   loop in optimizeBody only runs at the top-level body — vars inside closures that could
+   fold to literals won't be eliminated. This is a missed optimization, not wrong output.
+  4. Superclass method names not in forbidden (low risk): NameAllocator.forbidden only
+  contains the current class's method names. A short name like a could collide with an
+  inherited method name if the Wren runtime resolves it on this. In practice this matters
+   mostly for very short inherited method names.
+  5. Parser coverage (unknown risk): only a few files have been tested. Wren has some
+  unusual constructs (operator methods, subscript setters, attribute annotations) — the
+  parser may have gaps for rarely-used syntax.
+
+  ---
+  Rating: 72 / 100
+
+  It's production-quality for typical Wren code (the kind that appears in wren_core). The
+   risks are real but mostly in uncommon patterns. The import alias collision is the one
+  I'd classify as a latent bug that will eventually surface; the rest are edge cases or
+  missed optimizations rather than wrong output.
+
+"""
