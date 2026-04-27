@@ -115,8 +115,16 @@ private void printCommaSep(ref Appender!string buf, string[] items)
 private void printBlock(ref Appender!string buf, BlockStmt b)
 {
     buf.put('{');
-    foreach (s; b.stmts) { buf.put('\n'); printStmt(buf, s); }
-    buf.put('\n'); buf.put('}');
+    if (b.singleExpr && b.stmts.length == 1 && cast(ExprStmt) b.stmts[0] !is null)
+    {
+        printStmt(buf, b.stmts[0]);
+        buf.put('}');
+    }
+    else
+    {
+        foreach (s; b.stmts) { buf.put('\n'); printStmt(buf, s); }
+        buf.put('\n'); buf.put('}');
+    }
 }
 
 private void printStmt(ref Appender!string buf, Node s)
@@ -353,8 +361,16 @@ private void printBlockExpr(ref Appender!string buf, BlockExpr be)
 {
     buf.put('{');
     if (be.params.length) { buf.put('|'); printCommaSep(buf, be.params); buf.put('|'); }
-    foreach (s; be.body.stmts) { buf.put('\n'); printStmt(buf, s); }
-    buf.put('\n'); buf.put('}');
+    if (be.body.singleExpr && be.body.stmts.length == 1 && cast(ExprStmt) be.body.stmts[0] !is null)
+    {
+        printStmt(buf, be.body.stmts[0]);
+        buf.put('}');
+    }
+    else
+    {
+        foreach (s; be.body.stmts) { buf.put('\n'); printStmt(buf, s); }
+        buf.put('\n'); buf.put('}');
+    }
 }
 
 unittest

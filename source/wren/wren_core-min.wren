@@ -50,12 +50,8 @@ for(b in this){
 a.call(b)
 }
 }
-isEmpty{
-iterate(null)?false:true
-}
-map(a){
-MapSequence.new(this,a)
-}
+isEmpty{iterate(null)?false:true}
+map(a){MapSequence.new(this,a)}
 skip(a){
 if(!(a is Num)||!a.isInteger||a<0){
 Fiber.abort("Count must be a non-negative integer.")
@@ -68,9 +64,7 @@ Fiber.abort("Count must be a non-negative integer.")
 }
 return TakeSequence.new(this,a)
 }
-where(a){
-WhereSequence.new(this,a)
-}
+where(a){WhereSequence.new(this,a)}
 reduce(a,b){
 for(c in this){
 a=b.call(a,c)
@@ -86,9 +80,7 @@ c=a.call(c,iteratorValue(b))
 }
 return c
 }
-join(){
-join("")
-}
+join(){join("")}
 join(a){
 var b=true
 var c=""
@@ -112,12 +104,8 @@ construct new(a,b){
 _sequence=a
 _fn=b
 }
-iterate(a){
-_sequence.iterate(a)
-}
-iteratorValue(a){
-_fn.call(_sequence.iteratorValue(a))
-}
+iterate(a){_sequence.iterate(a)}
+iteratorValue(a){_fn.call(_sequence.iteratorValue(a))}
 }
 class SkipSequence is Sequence{
 construct new(a,b){
@@ -137,9 +125,7 @@ b=b-1
 return a
 }
 }
-iteratorValue(a){
-_sequence.iteratorValue(a)
-}
+iteratorValue(a){_sequence.iteratorValue(a)}
 }
 class TakeSequence is Sequence{
 construct new(a,b){
@@ -150,9 +136,7 @@ iterate(a){
 if(!a)_taken=1 else _taken=_taken+1
 return _taken>_count?null:_sequence.iterate(a)
 }
-iteratorValue(a){
-_sequence.iteratorValue(a)
-}
+iteratorValue(a){_sequence.iteratorValue(a)}
 }
 class WhereSequence is Sequence{
 construct new(a,b){
@@ -165,17 +149,11 @@ if(_fn.call(_sequence.iteratorValue(a)))break
 }
 return a
 }
-iteratorValue(a){
-_sequence.iteratorValue(a)
-}
+iteratorValue(a){_sequence.iteratorValue(a)}
 }
 class String is Sequence{
-bytes{
-StringByteSequence.new(this)
-}
-codePoints{
-StringCodePointSequence.new(this)
-}
+bytes{StringByteSequence.new(this)}
+codePoints{StringCodePointSequence.new(this)}
 split(a){
 if(!(a is String)||a.isEmpty){
 Fiber.abort("Delimiter must be a non-empty string.")
@@ -214,24 +192,12 @@ d=e+f
 if(d<g)c=c+this[d..-1]
 return c
 }
-trim(){
-trim_("\t\r\n ",true,true)
-}
-trim(a){
-trim_(a,true,true)
-}
-trimEnd(){
-trim_("\t\r\n ",false,true)
-}
-trimEnd(a){
-trim_(a,false,true)
-}
-trimStart(){
-trim_("\t\r\n ",true,false)
-}
-trimStart(a){
-trim_(a,true,false)
-}
+trim(){trim_("\t\r\n ",true,true)}
+trim(a){trim_(a,true,true)}
+trimEnd(){trim_("\t\r\n ",false,true)}
+trimEnd(a){trim_(a,false,true)}
+trimStart(){trim_("\t\r\n ",true,false)}
+trimStart(a){trim_(a,true,false)}
 trim_(a,b,c){
 if(!(a is String)){
 Fiber.abort("Characters must be a string.")
@@ -272,38 +238,18 @@ return b
 }
 }
 class StringByteSequence is Sequence{
-construct new(a){
-_string=a
-}
-[a]{
-_string.byteAt_(a)
-}
-iterate(a){
-_string.iterateByte_(a)
-}
-iteratorValue(a){
-_string.byteAt_(a)
-}
-count{
-_string.byteCount_
-}
+construct new(a){_string=a}
+[a]{_string.byteAt_(a)}
+iterate(a){_string.iterateByte_(a)}
+iteratorValue(a){_string.byteAt_(a)}
+count{_string.byteCount_}
 }
 class StringCodePointSequence is Sequence{
-construct new(a){
-_string=a
-}
-[a]{
-_string.codePointAt_(a)
-}
-iterate(a){
-_string.iterate(a)
-}
-iteratorValue(a){
-_string.codePointAt_(a)
-}
-count{
-_string.count
-}
+construct new(a){_string=a}
+[a]{_string.codePointAt_(a)}
+iterate(a){_string.iterate(a)}
+iteratorValue(a){_string.codePointAt_(a)}
+count{_string.count}
 }
 class List is Sequence{
 addAll(a){
@@ -312,11 +258,7 @@ add(b)
 }
 return a
 }
-sort(){
-sort{|a,b|
-a<b
-}
-}
+sort(){sort{|a,b|a<b}}
 sort(a){
 if(!(a is Fn)){
 Fiber.abort("Comparer must be a function.")
@@ -347,9 +289,7 @@ this[e+1]=this[b]
 this[b]=f
 return e+1
 }
-toString{
-"[%(join(", "))]"
-}
+toString{"[%(join(", "))]"}
 +(a){
 var b=this[0..-1]
 for(c in a){
@@ -369,12 +309,8 @@ return b
 }
 }
 class Map is Sequence{
-keys{
-MapKeySequence.new(this)
-}
-values{
-MapValueSequence.new(this)
-}
+keys{MapKeySequence.new(this)}
+values{MapValueSequence.new(this)}
 toString{
 var a=true
 var b="{"
@@ -394,44 +330,24 @@ construct new(a,b){
 _key=a
 _value=b
 }
-key{
-_key
-}
-value{
-_value
-}
-toString{
-"%(_key):%(_value)"
-}
+key{_key}
+value{_value}
+toString{"%(_key):%(_value)"}
 }
 class MapKeySequence is Sequence{
-construct new(a){
-_map=a
-}
-iterate(a){
-_map.iterate(a)
-}
-iteratorValue(a){
-_map.keyIteratorValue_(a)
-}
+construct new(a){_map=a}
+iterate(a){_map.iterate(a)}
+iteratorValue(a){_map.keyIteratorValue_(a)}
 }
 class MapValueSequence is Sequence{
-construct new(a){
-_map=a
-}
-iterate(a){
-_map.iterate(a)
-}
-iteratorValue(a){
-_map.valueIteratorValue_(a)
-}
+construct new(a){_map=a}
+iterate(a){_map.iterate(a)}
+iteratorValue(a){_map.valueIteratorValue_(a)}
 }
 class Range is Sequence{
 }
 class System{
-static print(){
-writeString_("\n")
-}
+static print(){writeString_("\n")}
 static print(a){
 writeObject_(a)
 writeString_("\n")
@@ -458,17 +374,11 @@ writeString_("[invalid toString]")
 }
 }
 class ClassAttributes{
-self{
-_attributes
-}
-methods{
-_methods
-}
+self{_attributes}
+methods{_methods}
 construct new(a,b){
 _attributes=a
 _methods=b
 }
-toString{
-"attributes:%(_attributes) methods:%(_methods)"
-}
+toString{"attributes:%(_attributes) methods:%(_methods)"}
 }

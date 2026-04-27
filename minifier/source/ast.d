@@ -60,6 +60,7 @@ class VarDecl : Node
 class BlockStmt : Node
 {
     Node[] stmts;
+    bool   singleExpr; // true when source had no newline after { — Wren implicit-return form
 }
 
 class IfStmt : Node

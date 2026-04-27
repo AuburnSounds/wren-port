@@ -116,7 +116,7 @@ private MethodDecl parseMethod(ref Parser p)
         m.kind   = MethodKind.construct;
         m.name   = p.expect(Tok.ident).text;
         m.params = parseParamList(p);
-        if (!isForeign) m.body = parseBlock(p); else p.consumeNewline();
+        if (!isForeign) m.body = parseBlock(p, true); else p.consumeNewline();
         return m;
     }
 
@@ -139,7 +139,7 @@ private MethodDecl parseMethod(ref Parser p)
             p.expect(Tok.rparen);
         }
         else m.kind = MethodKind.subscript;
-        if (!isForeign) m.body = parseBlock(p); else p.consumeNewline();
+        if (!isForeign) m.body = parseBlock(p, true); else p.consumeNewline();
         return m;
     }
 
@@ -156,7 +156,7 @@ private MethodDecl parseMethod(ref Parser p)
         m.kind = MethodKind.op;
         m.name = p.consume().text;
         if (p.cur.kind == Tok.lparen) m.params = parseParamList(p);
-        if (!isForeign) m.body = parseBlock(p); else p.consumeNewline();
+        if (!isForeign) m.body = parseBlock(p, true); else p.consumeNewline();
         return m;
     }
 
@@ -169,7 +169,7 @@ private MethodDecl parseMethod(ref Parser p)
         p.consume();
         m.kind   = MethodKind.setter;
         m.params = parseParamList(p);
-        if (!isForeign) m.body = parseBlock(p); else p.consumeNewline();
+        if (!isForeign) m.body = parseBlock(p, true); else p.consumeNewline();
         return m;
     }
 
@@ -185,7 +185,7 @@ private MethodDecl parseMethod(ref Parser p)
                            : (isStatic ? MethodKind.staticGetter         : MethodKind.getter);
     }
 
-    if (!isForeign) m.body = parseBlock(p); else p.consumeNewline();
+    if (!isForeign) m.body = parseBlock(p, true); else p.consumeNewline();
     return m;
 }
 
@@ -234,10 +234,12 @@ private VarDecl parseVarDecl(ref Parser p)
     return d;
 }
 
-private BlockStmt parseBlock(ref Parser p)
+private BlockStmt parseBlock(ref Parser p, bool isMethodBody = false)
 {
     p.expect(Tok.lbrace);
     auto b = new BlockStmt();
+    if (isMethodBody)
+        b.singleExpr = (p.cur.kind != Tok.newline);
     p.skipNewlines();
     while (p.cur.kind != Tok.rbrace && p.cur.kind != Tok.eof)
     {
@@ -612,6 +614,7 @@ private BlockExpr parseBlockExpr(ref Parser p)
 {
     p.expect(Tok.lbrace);
     auto b = new BlockExpr();
+    bool singleExpr = (p.cur.kind != Tok.newline);
     p.skipNewlines();
     if (p.cur.kind == Tok.pipe)
     {
@@ -622,9 +625,11 @@ private BlockExpr parseBlockExpr(ref Parser p)
             if (p.cur.kind == Tok.comma) p.consume();
         }
         p.expect(Tok.pipe);
+        singleExpr = (p.cur.kind != Tok.newline); // re-check after |params|
         p.skipNewlines();
     }
     auto body_ = new BlockStmt();
+    body_.singleExpr = singleExpr;
     while (p.cur.kind != Tok.rbrace && p.cur.kind != Tok.eof)
     {
         body_.stmts ~= parseStatement(p);
