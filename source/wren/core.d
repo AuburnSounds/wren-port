@@ -12,7 +12,7 @@ else
 nothrow @nogc:
 
 // The core module source that is interpreted whenever core is initialized.
-static immutable string coreModuleSource = import("wren_core.wren");
+static immutable string coreModuleSource = import("wren_core-min.wren");
 
 /++ Boolean primitives +/
 @WrenPrimitive("Bool", "!") 
