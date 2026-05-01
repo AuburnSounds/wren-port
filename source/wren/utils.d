@@ -248,6 +248,11 @@ uint wrenValidateIndex(uint count, long value) @nogc
   return uint.max;
 }
 
+bool wrenIsSpace(char ch) pure
+{
+    return ch == ' ' || ch == '\n' || ch == '\f'
+        || ch == '\r' || ch == '\t' || ch == '\v';
+}
 
 /// Float parsing
 
@@ -255,15 +260,19 @@ uint wrenValidateIndex(uint count, long value) @nogc
 /// strtod replacement, but without locale
 ///     s Must be a zero-terminated string.
 /// Note that this code is duplicated in dplug:core, this was to avoid a dependency on dplug:core here.
-public double strtod_nolocale(const(char)* s, const(char)** p)
+public double strtod_nolocale(const(char)* s, const(char)** p, bool* err = null)
 {
+    if (err) *err = false;
     bool strtod_err = false;
     const(char)* pend;
     double r = stb__clex_parse_number_literal(s, &pend, &strtod_err, true);
     if (p) 
         *p = pend;
     if (strtod_err)
+    {
+        if (err) *err = true;
         r = 0.0;
+    }
     return r;
 }
 unittest

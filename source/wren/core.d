@@ -3,6 +3,7 @@ import wren.math;
 import wren.primitive;
 import wren.value;
 import wren.vm;
+import wren.utils;
 
 version(LDC)
     import ldc.attributes: optStrategy;
@@ -1152,6 +1153,32 @@ bool num_toString(WrenVM* vm, Value* args) @nogc
     return RETURN_VAL(args, wrenNumToString(vm, AS_NUM(args[0])));   
 }
 
+@WrenPrimitive("Num", "fromString")
+bool num_fromString(WrenVM* vm, Value* args) @nogc
+{
+    if (!validateString(vm, args[1], "Argument")) return false;
+
+    ObjString* string = AS_STRING(args[1]);
+
+    // Corner case: Can't parse an empty string.
+    if (string.length == 0) return RETURN_NULL(args);
+
+    const(char)* end;
+    bool errored;
+    double parsed = strtod_nolocale(string.value.ptr, &end, &errored);
+
+    // Skip past any trailing whitespace.
+    while (*end != '\0' && wrenIsSpace(*end)) end++;
+
+    if (errored) return RETURN_ERROR(vm, "Number literal is too large.");
+
+    // We must have consumed the entire string. Otherwise, it contains non-number
+    // characters and we can't parse it.
+    if (end < string.value.ptr + string.length) return RETURN_NULL(args);
+
+    return RETURN_NUM(args, parsed);
+}
+
 @WrenPrimitive("Num", "truncate")
 bool num_truncate(WrenVM* vm, Value* args) @nogc
 {
@@ -1778,6 +1805,7 @@ void wrenInitializeCore(WrenVM* vm) @nogc
     addPrimitive(vm, vm.numClass, "isNan", &num_isNan, MethodType.METHOD_PRIMITIVE, false);
     addPrimitive(vm, vm.numClass, "sign", &num_sign, MethodType.METHOD_PRIMITIVE, false);
     addPrimitive(vm, vm.numClass, "toString", &num_toString, MethodType.METHOD_PRIMITIVE, false);
+    addPrimitive(vm, vm.numClass, "fromString(_)", &num_fromString, MethodType.METHOD_PRIMITIVE, false);
     addPrimitive(vm, vm.numClass, "truncate", &num_truncate, MethodType.METHOD_PRIMITIVE, false);
 
     vm.stringClass = AS_CLASS(wrenFindVariable(vm, coreModule, "String"));
