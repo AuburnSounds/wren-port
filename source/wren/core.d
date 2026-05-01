@@ -1752,6 +1752,7 @@ void wrenInitializeCore(WrenVM* vm) @nogc
     addPrimitive(vm, vm.nullClass, "toString", &null_toString, MethodType.METHOD_PRIMITIVE, false);
 
     vm.numClass = AS_CLASS(wrenFindVariable(vm, coreModule, "Num"));
+    addPrimitive(vm, vm.numClass, "fromString(_)", &num_fromString, MethodType.METHOD_PRIMITIVE, true);
     addPrimitive(vm, vm.numClass, "infinity", &num_infinity, MethodType.METHOD_PRIMITIVE, true);
     addPrimitive(vm, vm.numClass, "nan", &num_nan, MethodType.METHOD_PRIMITIVE, true);
     addPrimitive(vm, vm.numClass, "pi", &num_pi, MethodType.METHOD_PRIMITIVE, true);
@@ -1805,7 +1806,6 @@ void wrenInitializeCore(WrenVM* vm) @nogc
     addPrimitive(vm, vm.numClass, "isNan", &num_isNan, MethodType.METHOD_PRIMITIVE, false);
     addPrimitive(vm, vm.numClass, "sign", &num_sign, MethodType.METHOD_PRIMITIVE, false);
     addPrimitive(vm, vm.numClass, "toString", &num_toString, MethodType.METHOD_PRIMITIVE, false);
-    addPrimitive(vm, vm.numClass, "fromString(_)", &num_fromString, MethodType.METHOD_PRIMITIVE, false);
     addPrimitive(vm, vm.numClass, "truncate", &num_truncate, MethodType.METHOD_PRIMITIVE, false);
 
     vm.stringClass = AS_CLASS(wrenFindVariable(vm, coreModule, "String"));
