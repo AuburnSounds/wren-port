@@ -1872,6 +1872,11 @@ Value wrenNumToString(WrenVM* vm, double value)
     // = 24
     char[24] buffer;
     int length = sprintf(buffer.ptr, "%.14g", value);
+
+    // Remove potential , happening because of locale
+    for (int n = 0; n < length; ++n)
+        if (buffer[n] == ',') buffer[n] = '.';
+
     return wrenNewStringLength(vm, buffer.ptr, length);
 }
 
