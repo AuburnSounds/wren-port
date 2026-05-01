@@ -425,6 +425,7 @@ unittest
     }
 }
 
+// Note: adapted to support nan and infinity and -nan and -infinity like most libc
 private double stb__clex_parse_number_literal(const(char)* p, 
                                               const(char)**q, 
                                               bool* err,
@@ -465,6 +466,54 @@ private double stb__clex_parse_number_literal(const(char)* p,
         {
             base=16;
             p += 2;
+        }
+    }
+
+    bool parseLetter(ref char letter)
+    {
+        char ch = *p;
+        if ( (ch >= 'a' && ch <= 'z')
+             || (ch >= 'A' && ch <= 'Z' ))
+        {
+            letter = *p;
+            if (letter >= 'A' && letter <= 'Z')
+                letter += 'a' - 'A';
+            return true;
+        }
+        else
+             return false;
+    }
+
+    // parse a word, for special NaN and infinities values
+    char letter;
+    if (allowFloat && parseLetter(letter) && (letter == 'i' || letter == 'n'))
+    {
+        // Try to parse "infinity" or "nan" or "inf"
+        p += 1;
+        char[16] buf = void;
+        buf[0] = letter;
+        int len = 1;
+
+        while (len < 8 && parseLetter(letter))
+        {
+            p += 1;
+            buf[len++] = letter;
+        }
+        if (buf[0..len] == "nan")
+        {
+            value = double.nan;
+            goto success;
+        }
+        else if (buf[0..len] == "inf" || buf[0..len] == "infinity")
+        {
+            value = double.infinity;
+            goto success;
+        }
+        else
+        {
+            if (err) *err = false;
+            if (q) *q = p;
+            return 0;
         }
     }
 
@@ -526,6 +575,8 @@ private double stb__clex_parse_number_literal(const(char)* p,
                 value *= power;
         }
     }
+
+success:
 
     if (q) *q = p;
     if (err) *err = false; // seen no error
